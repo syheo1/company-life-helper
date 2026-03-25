@@ -1,6 +1,6 @@
 export type Feature = "weather" | "lunch" | "vote" | "notice" | "board";
 
-export type UserStatus = "pending" | "approved" | "rejected";
+export type UserStatus = "pending" | "approved" | "rejected" | "locked";
 export type AdminRole = "team_admin" | "super_admin";
 export type AccountType = "front" | "admin";
 
@@ -22,6 +22,7 @@ export interface AdminUser {
   role: AdminRole;
   status: UserStatus;
   createdAt: number;
+  permissions?: string[];
 }
 
 export interface Team {

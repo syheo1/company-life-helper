@@ -8,6 +8,7 @@ import {
   CheckSquare,
   Layers3,
   Loader2,
+  Lock,
   Bell,
   Megaphone,
   Pin,
@@ -17,6 +18,8 @@ import {
   Trash2,
   Utensils,
   UserCheck,
+  UserCog,
+  Users,
   X,
 } from "lucide-react";
 import Image from "next/image";
@@ -54,7 +57,8 @@ type AdminConsoleProps = {
 
 type AdminPageKey =
   | "dashboard"
-  | "users"
+  | "members"
+  | "admins"
   | "teams"
   | "notices"
   | "restaurants"
@@ -80,6 +84,31 @@ const FEATURE_LABELS: Record<Feature, string> = {
   board: "게시판",
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  pending: "가입대기",
+  approved: "승인",
+  locked: "잠금",
+  rejected: "반려",
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: "bg-orange-100 text-orange-600",
+  approved: "bg-green-100 text-green-600",
+  locked: "bg-red-100 text-red-600",
+  rejected: "bg-slate-100 text-slate-500",
+};
+
+const PERMISSION_MENU_KEYS: AdminPageKey[] = ["members", "admins", "teams", "notices", "restaurants", "polls", "calendar"];
+const PERMISSION_LABELS: Record<string, string> = {
+  members: "프론트 회원 관리",
+  admins: "관리자 관리",
+  teams: "팀 제어",
+  notices: "공지사항",
+  restaurants: "맛집 관리",
+  polls: "투표 관리",
+  calendar: "일정 관리",
+};
+
 const NAV_ITEMS: {
   key: AdminPageKey;
   label: string;
@@ -87,7 +116,8 @@ const NAV_ITEMS: {
   group: "management" | "content";
 }[] = [
   { key: "dashboard", label: "종합 현황", icon: ChartColumn, group: "management" },
-  { key: "users", label: "가입 승인 관리", icon: UserCheck, group: "management" },
+  { key: "members", label: "프론트 회원 관리", icon: Users, group: "management" },
+  { key: "admins", label: "관리자 관리", icon: UserCog, group: "management" },
   { key: "teams", label: "팀 및 기능 제어", icon: Layers3, group: "management" },
   { key: "notices", label: "공지사항 관리", icon: Megaphone, group: "content" },
   { key: "restaurants", label: "맛집 데이터 관리", icon: Utensils, group: "content" },
@@ -162,6 +192,16 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
   // Calendar event form
   const [showEventForm, setShowEventForm] = useState(false);
   const [eventForm, setEventForm] = useState({ title: "", emoji: "📅", date: "" });
+
+  // Member management
+  const [memberFilter, setMemberFilter] = useState<"all" | "pending" | "approved" | "locked">("all");
+  const [editingTeamUid, setEditingTeamUid] = useState("");
+  const [editingTeamValue, setEditingTeamValue] = useState("");
+
+  // Admin management
+  const [adminFilter, setAdminFilter] = useState<"all" | "pending" | "approved" | "locked">("all");
+  const [editingPermissionsUid, setEditingPermissionsUid] = useState("");
+  const [pendingPermissions, setPendingPermissions] = useState<string[]>([]);
 
   // Load management data on mount
   async function refreshData() {
@@ -331,6 +371,57 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
       );
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "상태 변경에 실패했습니다.");
+    } finally {
+      setBusyKey("");
+    }
+  }
+
+  async function deleteUser(accountType: AccountKind, uid: string) {
+    const collectionName = accountType === "admin" ? "adminUsers" : "frontUsers";
+    const taskKey = `del:${accountType}:${uid}`;
+    setBusyKey(taskKey);
+    clearMessages();
+    try {
+      const { db } = getFirebaseClient();
+      await deleteDoc(doc(db, collectionName, uid));
+      await refreshData();
+      setActionMessage("계정이 삭제되었습니다.");
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "삭제에 실패했습니다.");
+    } finally {
+      setBusyKey("");
+    }
+  }
+
+  async function changeUserTeam(uid: string, newTeamId: string) {
+    const taskKey = `team-change:${uid}`;
+    setBusyKey(taskKey);
+    clearMessages();
+    try {
+      const { db } = getFirebaseClient();
+      await updateDoc(doc(db, "frontUsers", uid), { teamId: newTeamId });
+      await refreshData();
+      setEditingTeamUid("");
+      setActionMessage("소속 팀이 변경되었습니다.");
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "팀 변경에 실패했습니다.");
+    } finally {
+      setBusyKey("");
+    }
+  }
+
+  async function saveAdminPermissions(uid: string, permissions: string[]) {
+    const taskKey = `permissions:${uid}`;
+    setBusyKey(taskKey);
+    clearMessages();
+    try {
+      const { db } = getFirebaseClient();
+      await updateDoc(doc(db, "adminUsers", uid), { permissions });
+      await refreshData();
+      setEditingPermissionsUid("");
+      setActionMessage("권한이 업데이트되었습니다.");
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "권한 변경에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -708,83 +799,122 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
     );
   }
 
-  function renderUsers() {
+  function renderMembers() {
+    const filtered =
+      memberFilter === "all" ? frontUsers : frontUsers.filter((u) => u.status === memberFilter);
+
     return (
       <div className="max-w-6xl space-y-6">
+        <div className="flex flex-wrap gap-2">
+          {(["all", "pending", "approved", "locked"] as const).map((f) => {
+            const count = f === "all" ? frontUsers.length : frontUsers.filter((u) => u.status === f).length;
+            return (
+              <button
+                key={f}
+                onClick={() => setMemberFilter(f)}
+                className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
+                  memberFilter === f
+                    ? "bg-indigo-600 text-white"
+                    : "border border-gray-200 bg-white text-slate-500 hover:border-indigo-300"
+                }`}
+              >
+                {f === "all" ? "전체" : STATUS_LABELS[f]} ({count})
+              </button>
+            );
+          })}
+        </div>
+
         <div className="overflow-hidden rounded-[2.5rem] border border-gray-100 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-gray-50 p-8">
-            <h3 className="text-xl font-black">가입 대기 리스트</h3>
-            <button
-              onClick={() => startTransition(() => void approveAllPending())}
-              disabled={pendingUsers.length === 0 || busyKey !== ""}
-              className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white disabled:bg-slate-300"
-            >
-              전체 승인
-            </button>
+          <div className="border-b border-gray-50 p-8">
+            <h3 className="text-xl font-black">프론트 회원 목록</h3>
+            <p className="mt-1 text-sm text-slate-400">총 {frontUsers.length}명</p>
           </div>
           <div className="p-8">
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b text-[10px] font-black uppercase tracking-widest text-slate-300">
-                  <th className="pb-4">이름 (식별자)</th>
-                  <th className="pb-4">유형</th>
+                  <th className="pb-4">이름 / 이메일</th>
                   <th className="pb-4">소속 팀</th>
-                  <th className="pb-4">요청일</th>
-                  <th className="pb-4 text-right">관리</th>
+                  <th className="pb-4">상태</th>
+                  <th className="pb-4">가입일</th>
+                  <th className="pb-4 text-right">삭제</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {pendingUsers.map((user) => {
-                  const approveKey = `${user.accountType}:${user.uid}:approved`;
-                  const rejectKey = `${user.accountType}:${user.uid}:rejected`;
-                  const isBusy = busyKey === approveKey || busyKey === rejectKey;
+                {filtered.map((user) => {
+                  const isEditingTeam = editingTeamUid === user.uid;
                   return (
                     <tr key={user.uid} className="transition-colors hover:bg-slate-50">
-                      <td className="py-5">
-                        <div className="text-sm font-bold text-slate-800">
-                          {user.name} ({user.identifier})
-                        </div>
+                      <td className="py-4">
+                        <p className="text-sm font-bold text-slate-800">{user.name}</p>
+                        <p className="text-xs text-slate-400">{user.email}</p>
                       </td>
-                      <td className="py-5">
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase text-slate-600">
-                          {user.accountType}
-                        </span>
+                      <td className="py-4">
+                        {isEditingTeam ? (
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={editingTeamValue}
+                              onChange={(e) => setEditingTeamValue(e.target.value)}
+                              className="rounded-xl border border-gray-200 px-3 py-1.5 text-xs outline-none focus:border-indigo-400"
+                            >
+                              {teams.map((t) => (
+                                <option key={t.id} value={t.id}>{t.name}</option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => startTransition(() => void changeUserTeam(user.uid, editingTeamValue))}
+                              disabled={busyKey !== ""}
+                              className="rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+                            >
+                              {busyKey === `team-change:${user.uid}` ? <Loader2 className="inline h-3 w-3 animate-spin" /> : "저장"}
+                            </button>
+                            <button
+                              onClick={() => setEditingTeamUid("")}
+                              className="rounded-xl border border-gray-200 px-3 py-1.5 text-xs text-slate-400"
+                            >
+                              취소
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => { setEditingTeamUid(user.uid); setEditingTeamValue(user.teamId); }}
+                            className="rounded-full bg-blue-50 px-3 py-1 text-[10px] font-bold text-blue-600 hover:bg-blue-100"
+                          >
+                            {teams.find((t) => t.id === user.teamId)?.name ?? user.teamId}
+                          </button>
+                        )}
                       </td>
-                      <td className="py-5">
-                        <span className="rounded-full bg-blue-50 px-3 py-1 text-[10px] font-bold text-blue-600">
-                          {user.teamId}
-                        </span>
+                      <td className="py-4">
+                        <select
+                          value={user.status}
+                          onChange={(e) =>
+                            startTransition(() =>
+                              void updateUserStatus("front", user.uid, e.target.value as "pending" | "approved" | "locked"),
+                            )
+                          }
+                          disabled={busyKey !== ""}
+                          className={`cursor-pointer rounded-full border-0 px-3 py-1 text-[10px] font-bold outline-none ${STATUS_COLORS[user.status] ?? "bg-slate-100 text-slate-500"}`}
+                        >
+                          <option value="pending">가입대기</option>
+                          <option value="approved">승인</option>
+                          <option value="locked">잠금</option>
+                        </select>
                       </td>
-                      <td className="py-5 text-xs font-medium text-slate-400">
+                      <td className="py-4 text-xs font-medium text-slate-400">
                         {formatDate(user.createdAt)}
                       </td>
-                      <td className="py-5">
-                        <div className="flex justify-end gap-2">
+                      <td className="py-4">
+                        <div className="flex justify-end">
                           <button
-                            onClick={() =>
-                              startTransition(() =>
-                                void updateUserStatus(user.accountType, user.uid, "approved"),
-                              )
-                            }
-                            disabled={busyKey !== "" && !isBusy}
-                            className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white transition hover:shadow-lg"
-                          >
-                            {busyKey === approveKey ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Check className="h-4 w-4" />
-                            )}
-                          </button>
-                          <button
-                            onClick={() =>
-                              startTransition(() =>
-                                void updateUserStatus(user.accountType, user.uid, "rejected"),
-                              )
-                            }
-                            disabled={busyKey !== "" && !isBusy}
+                            onClick={() => {
+                              if (window.confirm(`${user.name} 계정을 삭제하시겠습니까?`)) {
+                                startTransition(() => void deleteUser("front", user.uid));
+                              }
+                            }}
+                            disabled={busyKey !== ""}
                             className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-slate-300 transition hover:bg-red-50 hover:text-red-500"
                           >
-                            {busyKey === rejectKey ? (
+                            {busyKey === `del:front:${user.uid}` ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
                               <Trash2 className="h-4 w-4" />
@@ -797,9 +927,181 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
                 })}
               </tbody>
             </table>
-            {pendingUsers.length === 0 && (
+            {filtered.length === 0 && (
               <div className="pt-6">
-                <EmptyState text="승인 대기 중인 사용자가 없습니다." />
+                <EmptyState text="해당 조건의 회원이 없습니다." />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderAdmins() {
+    const filtered =
+      adminFilter === "all" ? adminUsers : adminUsers.filter((u) => u.status === adminFilter);
+
+    return (
+      <div className="max-w-6xl space-y-6">
+        <div className="flex flex-wrap gap-2">
+          {(["all", "pending", "approved", "locked"] as const).map((f) => {
+            const count = f === "all" ? adminUsers.length : adminUsers.filter((u) => u.status === f).length;
+            return (
+              <button
+                key={f}
+                onClick={() => setAdminFilter(f)}
+                className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
+                  adminFilter === f
+                    ? "bg-indigo-600 text-white"
+                    : "border border-gray-200 bg-white text-slate-500 hover:border-indigo-300"
+                }`}
+              >
+                {f === "all" ? "전체" : STATUS_LABELS[f]} ({count})
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="overflow-hidden rounded-[2.5rem] border border-gray-100 bg-white shadow-sm">
+          <div className="border-b border-gray-50 p-8">
+            <h3 className="text-xl font-black">관리자 목록</h3>
+            <p className="mt-1 text-sm text-slate-400">총 {adminUsers.length}명</p>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {filtered.map((admin) => {
+              const isEditingPermissions = editingPermissionsUid === admin.uid;
+              const currentPermissions = admin.permissions ?? [];
+              return (
+                <div key={admin.uid} className="p-6 transition-colors hover:bg-slate-50">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 font-bold text-indigo-600">
+                        {admin.name.slice(0, 1)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-slate-800">{admin.name}</p>
+                        <p className="text-xs text-slate-400">@{admin.adminId} · {admin.teamId}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`rounded-full px-3 py-1 text-[10px] font-bold ${
+                          admin.role === "super_admin"
+                            ? "bg-purple-100 text-purple-600"
+                            : "bg-indigo-100 text-indigo-600"
+                        }`}
+                      >
+                        {admin.role === "super_admin" ? "최고관리자" : "팀관리자"}
+                      </span>
+                      <select
+                        value={admin.status}
+                        onChange={(e) =>
+                          startTransition(() =>
+                            void updateUserStatus("admin", admin.uid, e.target.value as "pending" | "approved" | "locked"),
+                          )
+                        }
+                        disabled={busyKey !== ""}
+                        className={`cursor-pointer rounded-full border-0 px-3 py-1 text-[10px] font-bold outline-none ${STATUS_COLORS[admin.status] ?? "bg-slate-100 text-slate-500"}`}
+                      >
+                        <option value="pending">승인대기</option>
+                        <option value="approved">승인</option>
+                        <option value="locked">잠금</option>
+                      </select>
+                      <button
+                        onClick={() => {
+                          if (isEditingPermissions) {
+                            setEditingPermissionsUid("");
+                          } else {
+                            setEditingPermissionsUid(admin.uid);
+                            setPendingPermissions(currentPermissions);
+                          }
+                        }}
+                        className={`rounded-xl px-3 py-2 text-xs font-bold transition ${
+                          isEditingPermissions
+                            ? "bg-indigo-600 text-white"
+                            : "border border-gray-200 bg-white text-slate-500 hover:border-indigo-300"
+                        }`}
+                      >
+                        권한 설정
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`${admin.name} 관리자를 삭제하시겠습니까?`)) {
+                            startTransition(() => void deleteUser("admin", admin.uid));
+                          }
+                        }}
+                        disabled={busyKey !== ""}
+                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-slate-300 transition hover:bg-red-50 hover:text-red-500"
+                      >
+                        {busyKey === `del:admin:${admin.uid}` ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {isEditingPermissions && (
+                    <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50 p-5">
+                      <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-indigo-600">
+                        접근 권한 설정
+                      </p>
+                      <div className="mb-4 flex flex-wrap gap-2">
+                        {PERMISSION_MENU_KEYS.map((key) => {
+                          const checked = pendingPermissions.includes(key);
+                          return (
+                            <label
+                              key={key}
+                              className={`flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${
+                                checked
+                                  ? "bg-indigo-600 text-white"
+                                  : "border border-gray-200 bg-white text-slate-600 hover:border-indigo-300"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                className="sr-only"
+                                checked={checked}
+                                onChange={() => {
+                                  setPendingPermissions((prev) =>
+                                    checked ? prev.filter((p) => p !== key) : [...prev, key],
+                                  );
+                                }}
+                              />
+                              {checked && <Check className="h-3.5 w-3.5" />}
+                              {PERMISSION_LABELS[key]}
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => startTransition(() => void saveAdminPermissions(admin.uid, pendingPermissions))}
+                          disabled={busyKey !== ""}
+                          className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+                        >
+                          {busyKey === `permissions:${admin.uid}` ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : null}
+                          저장
+                        </button>
+                        <button
+                          onClick={() => setEditingPermissionsUid("")}
+                          className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-bold text-slate-500"
+                        >
+                          취소
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {filtered.length === 0 && (
+              <div className="p-8">
+                <EmptyState text="해당 조건의 관리자가 없습니다." />
               </div>
             )}
           </div>
@@ -1489,7 +1791,8 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
             ) : null}
 
             {!isLoading && activePage === "dashboard" ? renderDashboard() : null}
-            {!isLoading && activePage === "users" ? renderUsers() : null}
+            {!isLoading && activePage === "members" ? renderMembers() : null}
+            {!isLoading && activePage === "admins" ? renderAdmins() : null}
             {!isLoading && activePage === "teams" ? renderTeams() : null}
             {!isLoading && activePage === "notices" ? renderNotices() : null}
             {!isLoading && activePage === "restaurants" ? renderRestaurants() : null}

@@ -32,7 +32,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/pending", request.url));
   }
 
-  if (status === "rejected") {
+  if (status === "rejected" || status === "locked") {
     return NextResponse.redirect(
       new URL(accountType === "admin" ? "/admin/login" : "/login", request.url),
     );
