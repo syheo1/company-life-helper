@@ -35,6 +35,7 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
 import { getFirebaseClient } from "@/lib/firebase/config";
 import type {
@@ -171,6 +172,8 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
   // Notice form
   const [showNoticeForm, setShowNoticeForm] = useState(false);
   const [noticeForm, setNoticeForm] = useState({ title: "", content: "", isPinned: false });
+  const [noticeImageFile, setNoticeImageFile] = useState<File | null>(null);
+  const [noticeImagePreview, setNoticeImagePreview] = useState("");
 
   // Restaurant form
   const [showRestaurantForm, setShowRestaurantForm] = useState(false);
@@ -483,18 +486,29 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
     setBusyKey("notice-add");
     clearMessages();
     try {
-      const { db } = getFirebaseClient();
+      const { db, storage } = getFirebaseClient();
       const docRef = doc(collection(db, "notices"));
+
+      let imageUrl: string | undefined;
+      if (noticeImageFile) {
+        const storageRef = ref(storage, `notices/${docRef.id}/${noticeImageFile.name}`);
+        await uploadBytes(storageRef, noticeImageFile);
+        imageUrl = await getDownloadURL(storageRef);
+      }
+
       await setDoc(docRef, {
         id: docRef.id,
         title: noticeForm.title.trim(),
         content: noticeForm.content.trim(),
         teamId,
         isPinned: noticeForm.isPinned,
+        ...(imageUrl ? { imageUrl } : {}),
         createdAt: Date.now(),
         updatedAt: Date.now(),
       });
       setNoticeForm({ title: "", content: "", isPinned: false });
+      setNoticeImageFile(null);
+      setNoticeImagePreview("");
       setShowNoticeForm(false);
       await loadNotices();
       setActionMessage("공지사항이 등록되었습니다.");
@@ -1208,6 +1222,40 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
               onChange={(e) => setNoticeForm((f) => ({ ...f, content: e.target.value }))}
               className="w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400"
             />
+            <div>
+              <p className="mb-2 text-sm font-bold text-slate-700">이미지 첨부 (선택)</p>
+              <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-indigo-200 bg-white p-5 text-sm text-slate-400 transition hover:border-indigo-400 hover:text-indigo-500">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setNoticeImageFile(file);
+                    setNoticeImagePreview(URL.createObjectURL(file));
+                  }}
+                />
+                {noticeImagePreview ? (
+                  <img
+                    src={noticeImagePreview}
+                    alt="미리보기"
+                    className="max-h-48 rounded-lg object-contain"
+                  />
+                ) : (
+                  <span>클릭하여 이미지 선택</span>
+                )}
+              </label>
+              {noticeImageFile && (
+                <button
+                  type="button"
+                  onClick={() => { setNoticeImageFile(null); setNoticeImagePreview(""); }}
+                  className="mt-2 text-xs font-medium text-red-400 hover:text-red-600"
+                >
+                  이미지 제거
+                </button>
+              )}
+            </div>
             <label className="flex items-center gap-3 text-sm font-medium text-slate-700 cursor-pointer">
               <input
                 type="checkbox"
@@ -1252,6 +1300,13 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
                       <h4 className="font-bold text-slate-900">{notice.title}</h4>
                     </div>
                     <p className="text-sm text-slate-500 line-clamp-2">{notice.content}</p>
+                    {notice.imageUrl && (
+                      <img
+                        src={notice.imageUrl}
+                        alt="공지 이미지"
+                        className="mt-3 max-h-40 rounded-xl object-cover"
+                      />
+                    )}
                     <p className="mt-2 text-[10px] font-medium text-slate-300">
                       {formatDate(notice.createdAt)}
                     </p>

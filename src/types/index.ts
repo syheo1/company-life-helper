@@ -38,6 +38,7 @@ export interface Notice {
   content: string;
   teamId: string;
   isPinned: boolean;
+  imageUrl?: string;
   createdAt: number;
   updatedAt: number;
 }
