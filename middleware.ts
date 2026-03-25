@@ -10,7 +10,7 @@ export function middleware(request: NextRequest) {
   const status = request.cookies.get(SESSION_COOKIE_KEYS.status)?.value;
   const role = request.cookies.get(SESSION_COOKIE_KEYS.role)?.value;
 
-  if (pathname.startsWith("/admin")) {
+  if (pathname.startsWith("/admin") && pathname !== "/admin/login" && pathname !== "/admin/signup") {
     if (!uid) {
       return NextResponse.redirect(new URL("/admin/login", request.url));
     }
