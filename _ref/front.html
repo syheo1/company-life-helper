@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web App Team - Life Helper</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800&display=swap');
+        
+        :root {
+            --primary: #2563eb;
+            --bg-light: #f8fafc;
+        }
+
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background-color: var(--bg-light);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .custom-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #e2e8f0;
+            border-radius: 10px;
+        }
+
+        /* 애니메이션 */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        .animate-float { animation: float 3s ease-in-out infinite; }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+    </style>
+</head>
+<body class="text-slate-900 antialiased overflow-hidden">
+
+    <div class="flex h-screen w-full">
+        <!-- 사이드바 (데스크탑) -->
+        <aside class="hidden lg:flex w-72 bg-white border-r border-slate-100 flex-col p-8 shrink-0">
+            <div class="flex items-center gap-3 mb-12">
+                <div class="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
+                    <i class="fa-solid fa-bolt-lightning text-lg"></i>
+                </div>
+                <h1 class="text-xl font-bold tracking-tight">Life Helper</h1>
+            </div>
+
+            <nav class="flex-1 space-y-2">
+                <button onclick="switchTab('home')" class="nav-item active w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-blue-600 bg-blue-50 font-bold transition-all">
+                    <i class="fa-solid fa-house"></i> 대시보드
+                </button>
+                <button onclick="switchTab('calendar')" class="nav-item w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-slate-400 hover:bg-slate-50 font-bold transition-all">
+                    <i class="fa-solid fa-calendar-days"></i> 팀 일정
+                </button>
+                <button onclick="switchTab('lunch')" class="nav-item w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-slate-400 hover:bg-slate-50 font-bold transition-all">
+                    <i class="fa-solid fa-utensils"></i> 점심 추천
+                </button>
+                <button onclick="switchTab('vote')" class="nav-item w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-slate-400 hover:bg-slate-50 font-bold transition-all">
+                    <i class="fa-solid fa-check-to-slot"></i> 투표 참여
+                </button>
+            </nav>
+
+            <div class="mt-auto pt-8 border-t border-slate-50">
+                <div class="flex items-center gap-3 p-2 bg-slate-50 rounded-2xl">
+                    <div class="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                    <div class="flex-1 overflow-hidden">
+                        <p class="text-sm font-bold truncate">김도우미</p>
+                        <p class="text-[10px] text-slate-400 font-medium">웹앱 개발팀</p>
+                    </div>
+                    <button class="p-2 text-slate-300 hover:text-red-500 transition-colors">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 메인 영역 -->
+        <main class="flex-1 flex flex-col h-full relative overflow-hidden">
+            
+            <!-- 상단 헤더 -->
+            <header class="h-20 bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 lg:px-10 flex items-center justify-between sticky top-0 z-40">
+                <div class="lg:hidden flex items-center gap-3">
+                    <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white">
+                        <i class="fa-solid fa-bolt-lightning text-sm"></i>
+                    </div>
+                    <span class="font-bold text-lg">Helper</span>
+                </div>
+                <h2 id="header-title" class="hidden lg:block text-sm font-bold text-slate-400 uppercase tracking-widest">Dashboard</h2>
+                
+                <div class="flex items-center gap-4 md:gap-6">
+                    <!-- 날씨 위젯 -->
+                    <div class="hidden sm:flex items-center gap-3 px-4 py-2 bg-white border border-slate-100 rounded-full shadow-sm text-sm font-bold">
+                        <i class="fa-solid fa-cloud-sun text-blue-500"></i>
+                        <span>24°C</span>
+                        <span class="text-slate-300">|</span>
+                        <span class="text-slate-600 font-medium">성수동</span>
+                    </div>
+                    <button class="relative p-2 text-slate-400 hover:text-blue-600 transition-colors">
+                        <i class="fa-solid fa-bell text-xl"></i>
+                        <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- 컨텐츠 스크롤 -->
+            <div class="flex-1 overflow-y-auto custom-scroll p-6 lg:p-10 pb-24 lg:pb-10">
+                <div class="max-w-5xl mx-auto space-y-8">
+
+                    <!-- 홈 탭 -->
+                    <div id="tab-home" class="tab-content active animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            
+                            <!-- 공지사항 카드 -->
+                            <div class="lg:col-span-2 space-y-8">
+                                <div class="relative bg-gradient-to-br from-blue-600 to-indigo-700 p-8 lg:p-12 rounded-[2.5rem] text-white overflow-hidden shadow-2xl shadow-blue-200">
+                                    <div class="relative z-10">
+                                        <span class="inline-block px-3 py-1 bg-white/20 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4">공지사항</span>
+                                        <h3 class="text-2xl lg:text-4xl font-black mb-4 leading-tight">이번 주 금요일은<br>해피데이! 3시 퇴근입니다.</h3>
+                                        <p class="text-blue-100 opacity-90 text-sm lg:text-base max-w-md mb-8">모두 수고 많으셨습니다. 이번 주 금요일은 일찍 퇴근하여 주말을 즐겁게 시작하세요!</p>
+                                        <button class="bg-white text-blue-600 px-8 py-3.5 rounded-2xl font-bold text-sm shadow-xl hover:scale-105 transition-transform active:scale-95">자세히 보기</button>
+                                    </div>
+                                    <i class="fa-solid fa-bullhorn absolute -right-8 -bottom-8 text-white/10 text-[10rem] lg:text-[14rem] -rotate-12 animate-float"></i>
+                                </div>
+
+                                <div class="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-sm">
+                                    <h4 class="font-bold text-lg mb-6 flex items-center gap-3">
+                                        <i class="fa-solid fa-list-ul text-blue-500"></i> 최근 업데이트
+                                    </h4>
+                                    <div class="space-y-4">
+                                        <div class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl hover:bg-blue-50/50 transition-colors cursor-pointer group">
+                                            <div class="flex items-center gap-4">
+                                                <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-blue-500 shadow-sm">
+                                                    <i class="fa-solid fa-keyboard"></i>
+                                                </div>
+                                                <span class="font-bold text-sm text-slate-700 group-hover:text-blue-600 transition-colors">신규 M3 맥북 프로 신청 안내</span>
+                                            </div>
+                                            <span class="text-[10px] text-slate-400 font-bold">1시간 전</span>
+                                        </div>
+                                        <div class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl hover:bg-blue-50/50 transition-colors cursor-pointer group">
+                                            <div class="flex items-center gap-4">
+                                                <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-indigo-500 shadow-sm">
+                                                    <i class="fa-solid fa-shield-halved"></i>
+                                                </div>
+                                                <span class="font-bold text-sm text-slate-700 group-hover:text-blue-600 transition-colors">사내 보안 가이드라인 준수 요청</span>
+                                            </div>
+                                            <span class="text-[10px] text-slate-400 font-bold">어제</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 사이드 위젯 -->
+                            <div class="space-y-8">
+                                <!-- 캘린더 요약 -->
+                                <div class="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-sm">
+                                    <h4 class="font-bold text-lg mb-6 flex items-center gap-3">
+                                        <i class="fa-solid fa-calendar text-pink-500"></i> 오늘의 일정
+                                    </h4>
+                                    <div class="space-y-4">
+                                        <div class="flex items-center gap-4 p-4 bg-pink-50 rounded-2xl border border-pink-100">
+                                            <div class="text-2xl">🎂</div>
+                                            <div>
+                                                <p class="text-sm font-bold text-slate-800">이현우님 생일</p>
+                                                <p class="text-[10px] text-pink-500 font-bold uppercase">축하해 주세요!</p>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-4 p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                                            <div class="text-2xl">🍺</div>
+                                            <div>
+                                                <p class="text-sm font-bold text-slate-800">팀 전체 회식</p>
+                                                <p class="text-[10px] text-blue-500 font-bold uppercase">18:30pm · 성수동</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button class="w-full mt-6 py-3 text-xs font-bold text-slate-400 hover:text-blue-600 transition-colors underline underline-offset-4">일정 전체 보기</button>
+                                </div>
+
+                                <!-- 점심 추천 퀵 위젯 -->
+                                <div class="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-sm text-center">
+                                    <div class="w-14 h-14 bg-orange-50 text-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-4 text-xl">
+                                        <i class="fa-solid fa-utensils"></i>
+                                    </div>
+                                    <h4 class="font-bold mb-2">오늘 뭐 먹지?</h4>
+                                    <p class="text-xs text-slate-400 font-medium mb-6">결정 장애를 해결해 드립니다.</p>
+                                    <button onclick="switchTab('lunch')" class="w-full py-3.5 bg-orange-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-orange-100 hover:scale-[1.02] active:scale-95 transition-all">메뉴 추천받기</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 점심 추천 탭 -->
+                    <div id="tab-lunch" class="tab-content animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div class="bg-white rounded-[2.5rem] p-10 md:p-16 border border-slate-100 shadow-sm text-center">
+                            <div class="max-w-md mx-auto">
+                                <div id="lunch-picker-ui">
+                                    <div class="w-20 h-20 bg-orange-50 text-orange-500 rounded-3xl flex items-center justify-center mx-auto mb-8 text-3xl animate-bounce">
+                                        <i class="fa-solid fa-utensils"></i>
+                                    </div>
+                                    <h3 class="text-2xl font-black mb-4 leading-tight">오늘의 점심 파트너</h3>
+                                    <p class="text-slate-400 text-sm mb-12 font-medium leading-relaxed">어드민이 엄선한 우리 팀 전용 맛집 데이터에서<br>최고의 한 끼를 뽑아드립니다.</p>
+                                    
+                                    <div id="lunch-result" class="hidden mb-12 p-8 bg-orange-50 border-2 border-orange-200 border-dashed rounded-[2rem] animate-in zoom-in duration-500">
+                                        <span class="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-2 block">오늘의 메뉴는?</span>
+                                        <h4 id="result-name" class="text-3xl font-black text-slate-900">성수 진라멘</h4>
+                                        <p id="result-meta" class="text-sm text-slate-500 mt-2 font-bold">일식 · 평점 4.8 · 도보 5분</p>
+                                    </div>
+
+                                    <button onclick="pickLunch()" id="pick-btn" class="w-full py-5 bg-orange-500 text-white rounded-3xl font-black text-lg shadow-xl shadow-orange-100 hover:scale-105 active:scale-95 transition-all">
+                                        랜덤 추천 시작!
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 투표 참여 탭 -->
+                    <div id="tab-vote" class="tab-content animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div class="space-y-6">
+                            <div class="flex items-center justify-between px-2">
+                                <h3 class="text-2xl font-black">진행 중인 투표</h3>
+                                <button class="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-blue-100">+ 투표 생성</button>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div class="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-sm">
+                                    <div class="flex items-center justify-between mb-6">
+                                        <span class="px-3 py-1 bg-green-100 text-green-600 rounded-full text-[10px] font-bold">진행 중</span>
+                                        <span class="text-[10px] font-bold text-slate-300">D-2 남음</span>
+                                    </div>
+                                    <h4 class="text-xl font-bold mb-8">5월 팀 전체 회식 장소 투표 🍻</h4>
+                                    <div class="space-y-3">
+                                        <div onclick="vote(this)" class="group cursor-pointer relative w-full h-14 bg-slate-50 rounded-2xl border-2 border-transparent hover:border-blue-500/20 hover:bg-white transition-all overflow-hidden">
+                                            <div class="absolute inset-y-0 left-0 bg-blue-100 w-[65%] transition-all duration-1000"></div>
+                                            <div class="absolute inset-0 px-5 flex items-center justify-between font-bold text-sm">
+                                                <span class="text-slate-700">성수 오마카세</span>
+                                                <span class="text-blue-600">65% (12명)</span>
+                                            </div>
+                                        </div>
+                                        <div onclick="vote(this)" class="group cursor-pointer relative w-full h-14 bg-slate-50 rounded-2xl border-2 border-transparent hover:border-blue-500/20 hover:bg-white transition-all overflow-hidden">
+                                            <div class="absolute inset-y-0 left-0 bg-blue-100 w-[25%] transition-all duration-1000"></div>
+                                            <div class="absolute inset-0 px-5 flex items-center justify-between font-bold text-sm">
+                                                <span class="text-slate-700">가성비 소고기</span>
+                                                <span class="text-blue-600">25% (4명)</span>
+                                            </div>
+                                        </div>
+                                        <div onclick="vote(this)" class="group cursor-pointer relative w-full h-14 bg-slate-50 rounded-2xl border-2 border-transparent hover:border-blue-500/20 hover:bg-white transition-all overflow-hidden">
+                                            <div class="absolute inset-y-0 left-0 bg-blue-100 w-[10%] transition-all duration-1000"></div>
+                                            <div class="absolute inset-0 px-5 flex items-center justify-between font-bold text-sm">
+                                                <span class="text-slate-700">맥주 전문 펍</span>
+                                                <span class="text-blue-600">10% (2명)</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 일정 탭 -->
+                    <div id="tab-calendar" class="tab-content animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div class="bg-white rounded-[2.5rem] p-8 lg:p-12 border border-slate-100 shadow-sm">
+                            <div class="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-6">
+                                <div>
+                                    <h3 class="text-2xl font-black">팀 캘린더</h3>
+                                    <p class="text-slate-400 text-sm mt-1 font-medium">중요한 팀 일정을 한눈에 관리하세요.</p>
+                                </div>
+                                <div class="flex items-center gap-4 bg-slate-50 p-2 rounded-2xl">
+                                    <button class="p-2.5 hover:bg-white hover:shadow-sm rounded-xl transition-all"><i class="fa-solid fa-chevron-left text-slate-400"></i></button>
+                                    <span class="px-4 font-bold text-slate-700">2026년 3월</span>
+                                    <button class="p-2.5 hover:bg-white hover:shadow-sm rounded-xl transition-all"><i class="fa-solid fa-chevron-right text-slate-400"></i></button>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-7 gap-px bg-slate-100 border border-slate-100 rounded-3xl overflow-hidden shadow-sm">
+                                <!-- 요일 -->
+                                <div class="bg-slate-50 p-4 text-center text-[10px] font-black text-slate-300 uppercase">Sun</div>
+                                <div class="bg-slate-50 p-4 text-center text-[10px] font-black text-slate-300 uppercase">Mon</div>
+                                <div class="bg-slate-50 p-4 text-center text-[10px] font-black text-slate-300 uppercase">Tue</div>
+                                <div class="bg-slate-50 p-4 text-center text-[10px] font-black text-slate-300 uppercase">Wed</div>
+                                <div class="bg-slate-50 p-4 text-center text-[10px] font-black text-slate-300 uppercase">Thu</div>
+                                <div class="bg-slate-50 p-4 text-center text-[10px] font-black text-slate-300 uppercase">Fri</div>
+                                <div class="bg-slate-50 p-4 text-center text-[10px] font-black text-slate-300 uppercase">Sat</div>
+                                <!-- 빈 날짜 (더미) -->
+                                <script>
+                                    for(let i=1; i<=31; i++) {
+                                        const isSpecial = i === 24 || i === 26;
+                                        document.write(`
+                                            <div class="bg-white h-24 md:h-36 p-4 hover:bg-blue-50/50 transition-colors relative group cursor-pointer">
+                                                <span class="text-sm font-bold ${isSpecial ? 'text-blue-600' : 'text-slate-400'}">${i}</span>
+                                                ${i === 24 ? '<div class="mt-2 p-1.5 bg-pink-100 text-pink-600 rounded-lg text-[10px] font-bold truncate">🎂 이현우님 생일</div>' : ''}
+                                                ${i === 26 ? '<div class="mt-2 p-1.5 bg-blue-100 text-blue-600 rounded-lg text-[10px] font-bold truncate">🍺 전체 회식</div>' : ''}
+                                                <button class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity text-blue-400">
+                                                    <i class="fa-solid fa-plus text-xs"></i>
+                                                </button>
+                                            </div>
+                                        `);
+                                    }
+                                </script>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- 하단 탭 바 (모바일 전용) -->
+            <nav class="lg:hidden fixed bottom-0 left-0 right-0 h-20 bg-white/90 backdrop-blur-xl border-t border-slate-100 flex items-center justify-around px-4 z-50 pb-4">
+                <button onclick="switchTab('home')" class="mobile-nav-item active flex flex-col items-center gap-1 text-blue-600">
+                    <i class="fa-solid fa-house text-xl"></i>
+                    <span class="text-[10px] font-bold">홈</span>
+                </button>
+                <button onclick="switchTab('calendar')" class="mobile-nav-item flex flex-col items-center gap-1 text-slate-300">
+                    <i class="fa-solid fa-calendar text-xl"></i>
+                    <span class="text-[10px] font-bold">일정</span>
+                </button>
+                <button onclick="switchTab('lunch')" class="mobile-nav-item flex flex-col items-center gap-1 text-slate-300">
+                    <i class="fa-solid fa-utensils text-xl"></i>
+                    <span class="text-[10px] font-bold">점심</span>
+                </button>
+                <button onclick="switchTab('vote')" class="mobile-nav-item flex flex-col items-center gap-1 text-slate-300">
+                    <i class="fa-solid fa-check-to-slot text-xl"></i>
+                    <span class="text-[10px] font-bold">투표</span>
+                </button>
+            </nav>
+        </main>
+    </div>
+
+    <script>
+        // 탭 전환 로직
+        function switchTab(tabId) {
+            // 모든 탭 숨기기
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+
+            // 헤더 타이틀 변경
+            const titleMap = {
+                'home': 'Dashboard',
+                'calendar': 'Team Calendar',
+                'lunch': 'Lunch Recommendation',
+                'vote': 'Polls & Surveys'
+            };
+            document.getElementById('header-title').textContent = titleMap[tabId];
+
+            // 네비게이션 스타일 업데이트 (데스크탑)
+            document.querySelectorAll('.nav-item').forEach(el => {
+                el.classList.remove('text-blue-600', 'bg-blue-50');
+                el.classList.add('text-slate-400');
+            });
+            const activeNav = Array.from(document.querySelectorAll('.nav-item')).find(el => el.textContent.toLowerCase().includes(tabId === 'home' ? '대시보드' : tabId === 'calendar' ? '일정' : tabId === 'lunch' ? '점심' : '투표'));
+            if(activeNav) {
+                activeNav.classList.add('text-blue-600', 'bg-blue-50');
+                activeNav.classList.remove('text-slate-400');
+            }
+
+            // 네비게이션 스타일 업데이트 (모바일)
+            document.querySelectorAll('.mobile-nav-item').forEach(el => {
+                el.classList.remove('text-blue-600');
+                el.classList.add('text-slate-300');
+            });
+            const activeMobile = Array.from(document.querySelectorAll('.mobile-nav-item')).find(el => el.textContent.toLowerCase().includes(tabId === 'home' ? '홈' : tabId === 'calendar' ? '일정' : tabId === 'lunch' ? '점심' : '투표'));
+            if(activeMobile) activeMobile.classList.add('text-blue-600');
+            
+            // 모바일 닫기 (자동 스크롤 업)
+            document.querySelector('.overflow-y-auto').scrollTop = 0;
+        }
+
+        // 점심 추천 로직
+        const restaurants = [
+            { name: "성수 진라멘", meta: "일식 · 평점 4.8 · 도보 5분" },
+            { name: "갓잇 성수점", meta: "멕시코식 · 평점 4.7 · 도보 7분" },
+            { name: "할머니 레시피", meta: "한식 · 평점 4.5 · 도보 3분" },
+            { name: "버거보이", meta: "양식 · 평점 4.6 · 도보 4분" },
+            { name: "난포", meta: "퓨전한식 · 평점 4.9 · 도보 10분" }
+        ];
+
+        function pickLunch() {
+            const btn = document.getElementById('pick-btn');
+            const resultDiv = document.getElementById('lunch-result');
+            const nameEl = document.getElementById('result-name');
+            const metaEl = document.getElementById('result-meta');
+
+            btn.disabled = true;
+            btn.textContent = "추천 메뉴를 고르는 중...";
+            resultDiv.classList.add('hidden');
+
+            setTimeout(() => {
+                const pick = restaurants[Math.floor(Math.random() * restaurants.length)];
+                nameEl.textContent = pick.name;
+                metaEl.textContent = pick.meta;
+                
+                resultDiv.classList.remove('hidden');
+                btn.disabled = false;
+                btn.textContent = "다시 추천받기";
+            }, 1500);
+        }
+
+        // 투표 모의 클릭
+        function vote(el) {
+            const allItems = el.parentElement.querySelectorAll('.group');
+            allItems.forEach(item => {
+                item.classList.remove('border-blue-500', 'bg-blue-50/50');
+                item.classList.add('border-transparent', 'bg-slate-50');
+            });
+            el.classList.remove('border-transparent', 'bg-slate-50');
+            el.classList.add('border-blue-500', 'bg-blue-50/50');
+        }
+    </script>
+</body>
+</html>

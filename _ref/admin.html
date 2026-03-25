@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web App Team Helper - Admin Portal Design</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;800&display=swap');
+        body { font-family: 'Pretendard', sans-serif; }
+        .soft-shadow { box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.05); }
+        .admin-sidebar { background: #1e1b4b; } /* Indigo 950 */
+        .page { display: none; }
+        .page.active { display: block; }
+    </style>
+</head>
+<body class="bg-[#F3F4F6] text-slate-800">
+
+    <div id="root" class="flex h-screen overflow-hidden">
+
+        <!-- 1. 어드민 전용 사이드바 -->
+        <aside class="w-72 admin-sidebar text-white p-8 flex flex-col shrink-0 shadow-2xl">
+            <div class="flex items-center space-x-3 mb-12">
+                <div class="w-10 h-10 bg-indigo-500 rounded-2xl flex items-center justify-center text-white text-xl font-black">A</div>
+                <span class="font-extrabold text-2xl tracking-tighter">Admin Console</span>
+            </div>
+            
+            <nav class="flex-1 space-y-1">
+                <p class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-4 px-4">Management</p>
+                <button onclick="showAdminPage('admin-dashboard')" class="admin-nav-btn w-full flex items-center space-x-3 p-4 rounded-2xl font-bold bg-indigo-800 text-white transition-all">
+                    <i class="fa-solid fa-chart-line w-5"></i>
+                    <span>종합 현황</span>
+                </button>
+                <button onclick="showAdminPage('admin-users')" class="admin-nav-btn w-full flex items-center space-x-3 p-4 text-indigo-300 hover:bg-white/10 rounded-2xl font-bold transition-all">
+                    <i class="fa-solid fa-user-check w-5"></i>
+                    <span>가입 승인 관리</span>
+                </button>
+                <button onclick="showAdminPage('admin-teams')" class="admin-nav-btn w-full flex items-center space-x-3 p-4 text-indigo-300 hover:bg-white/10 rounded-2xl font-bold transition-all">
+                    <i class="fa-solid fa-layer-group w-5"></i>
+                    <span>팀 및 기능 제어</span>
+                </button>
+                
+                <p class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mt-8 mb-4 px-4">Content</p>
+                <button onclick="showAdminPage('admin-notices')" class="admin-nav-btn w-full flex items-center space-x-3 p-4 text-indigo-300 hover:bg-white/10 rounded-2xl font-bold transition-all">
+                    <i class="fa-solid fa-bullhorn w-5"></i>
+                    <span>공지사항 관리</span>
+                </button>
+                <button onclick="showAdminPage('admin-restaurants')" class="admin-nav-btn w-full flex items-center space-x-3 p-4 text-indigo-300 hover:bg-white/10 rounded-2xl font-bold transition-all">
+                    <i class="fa-solid fa-utensils w-5"></i>
+                    <span>맛집 데이터 관리</span>
+                </button>
+            </nav>
+
+            <div class="mt-auto border-t border-white/10 pt-6">
+                <button class="flex items-center space-x-3 p-4 text-indigo-300 hover:text-white transition-all w-full">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    <span class="font-bold">로그아웃</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- 2. 어드민 메인 영역 -->
+        <main class="flex-1 flex flex-col h-full overflow-hidden">
+            
+            <!-- 어드민 헤더 -->
+            <header class="h-20 bg-white border-b border-gray-200 flex items-center justify-between px-10 shrink-0 z-10">
+                <div>
+                    <h2 id="admin-page-title" class="text-xl font-black text-slate-800 tracking-tight">종합 현황</h2>
+                </div>
+                <div class="flex items-center space-x-6">
+                    <div class="text-right">
+                        <p class="text-xs font-bold text-slate-900 leading-none">슈퍼 관리자</p>
+                        <p class="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-tighter">System Master</p>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400">
+                        <i class="fa-solid fa-user-gear text-lg"></i>
+                    </div>
+                </div>
+            </header>
+
+            <!-- 어드민 컨텐츠 -->
+            <div id="admin-content-area" class="flex-1 overflow-y-auto p-10">
+                
+                <!-- 페이지 1: 종합 현황 -->
+                <div id="admin-dashboard" class="page active max-w-6xl mx-auto space-y-8">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                            <p class="text-[10px] font-black text-slate-400 uppercase mb-2">Total Users</p>
+                            <h3 class="text-3xl font-black text-slate-900">128명</h3>
+                        </div>
+                        <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                            <p class="text-[10px] font-black text-orange-500 uppercase mb-2">Pending</p>
+                            <h3 class="text-3xl font-black text-slate-900">5명</h3>
+                        </div>
+                        <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                            <p class="text-[10px] font-black text-blue-500 uppercase mb-2">Total Teams</p>
+                            <h3 class="text-3xl font-black text-slate-900">8개</h3>
+                        </div>
+                        <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                            <p class="text-[10px] font-black text-green-500 uppercase mb-2">Active Polls</p>
+                            <h3 class="text-3xl font-black text-slate-900">2개</h3>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm">
+                            <h4 class="font-bold text-lg mb-6">최근 가입 신청</h4>
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center font-bold text-slate-300">P</div>
+                                        <div>
+                                            <p class="text-sm font-bold">박지민 (webapp)</p>
+                                            <p class="text-[10px] text-slate-400">2시간 전 신청</p>
+                                        </div>
+                                    </div>
+                                    <button class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-[10px] font-bold">승인하기</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm">
+                            <h4 class="font-bold text-lg mb-6">시스템 리소스 상태</h4>
+                            <div class="space-y-4">
+                                <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                    <div class="w-2/3 h-full bg-indigo-500"></div>
+                                </div>
+                                <p class="text-[10px] text-slate-400 font-bold tracking-widest">DATABASE USAGE: 64%</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 페이지 2: 가입 승인 관리 -->
+                <div id="admin-users" class="page max-w-6xl mx-auto space-y-6">
+                    <div class="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+                        <div class="p-8 border-b border-gray-50 flex justify-between items-center">
+                            <h3 class="text-xl font-black">가입 대기 리스트</h3>
+                            <div class="flex space-x-2">
+                                <button class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold">전체 승인</button>
+                            </div>
+                        </div>
+                        <div class="p-8">
+                            <table class="w-full text-left">
+                                <thead>
+                                    <tr class="text-[10px] font-black text-slate-300 uppercase tracking-widest border-b pb-4">
+                                        <th class="pb-4">이름 (ID)</th>
+                                        <th class="pb-4">소속 팀</th>
+                                        <th className="pb-4">신청일자</th>
+                                        <th class="pb-4 text-right">관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-50">
+                                    <tr class="hover:bg-slate-50 transition-colors">
+                                        <td class="py-5 font-bold text-sm">이신입 (newbie_25)</td>
+                                        <td class="py-5">
+                                            <span class="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold">Web App Dev</span>
+                                        </td>
+                                        <td class="py-5 text-xs text-slate-400 font-medium">2025-05-20 10:30</td>
+                                        <td class="py-5 text-right flex justify-end space-x-2">
+                                            <button class="w-9 h-9 bg-indigo-600 text-white rounded-xl flex items-center justify-center hover:shadow-lg"><i class="fa-solid fa-check text-xs"></i></button>
+                                            <button class="w-9 h-9 bg-white border border-gray-200 text-slate-300 rounded-xl flex items-center justify-center hover:bg-red-50 hover:text-red-500"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 페이지 3: 팀 및 기능 제어 (핵심) -->
+                <div id="admin-teams" class="page max-w-6xl mx-auto space-y-8">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-2xl font-black">팀별 기능 활성화 설정</h3>
+                        <button class="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black text-sm shadow-lg shadow-indigo-100">+ 새로운 팀 추가</button>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-6">
+                        <div class="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm">
+                            <div class="flex items-center justify-between mb-8 pb-8 border-b border-gray-50">
+                                <div class="flex items-center space-x-4">
+                                    <div class="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-xl font-bold">W</div>
+                                    <div>
+                                        <h4 class="text-xl font-black">Web App Dev Team</h4>
+                                        <p class="text-xs text-slate-400 font-bold uppercase mt-1">ID: webapp · 12 Members</p>
+                                    </div>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button class="p-3 text-slate-300 hover:text-blue-500 transition-all"><i class="fa-solid fa-pen-to-square"></i></button>
+                                    <button class="p-3 text-slate-300 hover:text-red-500 transition-all"><i class="fa-solid fa-trash-can"></i></button>
+                                </div>
+                            </div>
+                            
+                            <p class="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-6">Feature Access Control</p>
+                            <div class="flex flex-wrap gap-3">
+                                <button class="flex items-center space-x-3 px-6 py-4 bg-indigo-50 border-2 border-indigo-600 text-indigo-600 rounded-2xl font-bold text-sm shadow-sm">
+                                    <i class="fa-solid fa-bullhorn"></i>
+                                    <span>공지사항</span>
+                                    <i class="fa-solid fa-check-circle ml-1"></i>
+                                </button>
+                                <button class="flex items-center space-x-3 px-6 py-4 bg-indigo-50 border-2 border-indigo-600 text-indigo-600 rounded-2xl font-bold text-sm shadow-sm">
+                                    <i class="fa-solid fa-sun text-yellow-500"></i>
+                                    <span>실시간 날씨</span>
+                                    <i class="fa-solid fa-check-circle ml-1"></i>
+                                </button>
+                                <button class="flex items-center space-x-3 px-6 py-4 bg-indigo-50 border-2 border-indigo-600 text-indigo-600 rounded-2xl font-bold text-sm shadow-sm">
+                                    <i class="fa-solid fa-calendar-days text-pink-500"></i>
+                                    <span>팀 캘린더</span>
+                                    <i class="fa-solid fa-check-circle ml-1"></i>
+                                </button>
+                                <button class="flex items-center space-x-3 px-6 py-4 bg-white border-2 border-gray-100 text-slate-300 rounded-2xl font-bold text-sm hover:border-indigo-200 transition-all">
+                                    <i class="fa-solid fa-utensils"></i>
+                                    <span>점심 추천</span>
+                                    <i class="fa-solid fa-lock ml-1 opacity-30"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- 어드민 페이지 전환 스크립트 -->
+    <script>
+        function showAdminPage(pageId) {
+            // 모든 페이지 숨기기
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            // 선택한 페이지 보이기
+            document.getElementById(pageId).classList.add('active');
+            
+            // 사이드바 버튼 상태 변경
+            document.querySelectorAll('.admin-nav-btn').forEach(btn => {
+                btn.classList.remove('bg-indigo-800', 'text-white');
+                btn.classList.add('text-indigo-300', 'hover:bg-white/10');
+            });
+            
+            // 클릭된 버튼 찾아서 활성화 (ID 기반 매칭 시뮬레이션)
+            const clickedBtn = event.currentTarget;
+            if(clickedBtn) {
+                clickedBtn.classList.add('bg-indigo-800', 'text-white');
+                clickedBtn.classList.remove('text-indigo-300', 'hover:bg-white/10');
+            }
+
+            // 헤더 타이틀 변경
+            const titleMap = {
+                'admin-dashboard': '종합 현황',
+                'admin-users': '가입 승인 관리',
+                'admin-teams': '팀 및 기능 제어',
+                'admin-notices': '공지사항 관리',
+                'admin-restaurants': '맛집 데이터 관리'
+            };
+            document.getElementById('admin-page-title').textContent = titleMap[pageId];
+        }
+    </script>
+</body>
+</html>
