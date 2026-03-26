@@ -35,7 +35,18 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+async function uploadImageToCloudinary(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", "notices");
+  const res = await fetch("https://api.cloudinary.com/v1_1/dmkjbo1vl/image/upload", {
+    method: "POST",
+    body: formData,
+  });
+  if (!res.ok) throw new Error("이미지 업로드에 실패했습니다.");
+  const data = await res.json();
+  return data.secure_url as string;
+}
 
 import { getFirebaseClient } from "@/lib/firebase/config";
 import type {
@@ -486,14 +497,12 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
     setBusyKey("notice-add");
     clearMessages();
     try {
-      const { db, storage } = getFirebaseClient();
+      const { db } = getFirebaseClient();
       const docRef = doc(collection(db, "notices"));
 
       let imageUrl: string | undefined;
       if (noticeImageFile) {
-        const storageRef = ref(storage, `notices/${docRef.id}/${noticeImageFile.name}`);
-        await uploadBytes(storageRef, noticeImageFile);
-        imageUrl = await getDownloadURL(storageRef);
+        imageUrl = await uploadImageToCloudinary(noticeImageFile);
       }
 
       await setDoc(docRef, {
