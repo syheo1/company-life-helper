@@ -35,7 +35,15 @@ import type { CalendarEvent, Notice, Poll, Restaurant } from "@/types";
 
 type TabId = "home" | "calendar" | "lunch" | "vote";
 
-type WeatherData = { temp: number; label: string; code: number; windSpeed: number };
+type WeatherData = {
+  temp: number;
+  label: string;
+  code: number;
+  windSpeed: number;
+  locationName: string;
+  willRain: boolean;
+  willSnow: boolean;
+};
 
 const TAB_TITLES: Record<TabId, string> = {
   home: "Dashboard",
@@ -215,17 +223,51 @@ export default function DashboardPage() {
       } catch {
         // Fall back to Seoul
       }
-      const res = await fetch(
-        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m&timezone=auto`,
-      );
-      const data = (await res.json()) as {
+
+      const [weatherRes, geoRes] = await Promise.all([
+        fetch(
+          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m&hourly=precipitation_probability,weather_code&forecast_days=1&timezone=auto`,
+        ),
+        fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=ko`,
+          { headers: { "User-Agent": "company-life-helper-app" } },
+        ),
+      ]);
+
+      const weatherData = (await weatherRes.json()) as {
         current: { temperature_2m: number; weather_code: number; wind_speed_10m: number };
+        hourly: { time: string[]; precipitation_probability: number[]; weather_code: number[] };
       };
+
+      const geoData = (await geoRes.json()) as {
+        address?: { city?: string; town?: string; county?: string; state?: string; suburb?: string };
+      };
+
+      const locationName =
+        geoData.address?.city ??
+        geoData.address?.town ??
+        geoData.address?.suburb ??
+        geoData.address?.county ??
+        geoData.address?.state ??
+        "현재 위치";
+
+      // Check next 6 hours for rain/snow
+      const nowHour = new Date().getHours();
+      const next6 = weatherData.hourly.weather_code.slice(nowHour, nowHour + 6);
+      const next6Prob = weatherData.hourly.precipitation_probability.slice(nowHour, nowHour + 6);
+      const willRain =
+        next6.some((c) => (c >= 51 && c <= 67) || (c >= 80 && c <= 82) || c >= 95) ||
+        next6Prob.some((p) => p >= 60);
+      const willSnow = next6.some((c) => (c >= 71 && c <= 77) || c === 85 || c === 86);
+
       setWeather({
-        temp: Math.round(data.current.temperature_2m),
-        label: WEATHER_CODES[data.current.weather_code] ?? "날씨 정보 없음",
-        code: data.current.weather_code,
-        windSpeed: Math.round(data.current.wind_speed_10m * 10) / 10,
+        temp: Math.round(weatherData.current.temperature_2m),
+        label: WEATHER_CODES[weatherData.current.weather_code] ?? "날씨 정보 없음",
+        code: weatherData.current.weather_code,
+        windSpeed: Math.round(weatherData.current.wind_speed_10m * 10) / 10,
+        locationName,
+        willRain,
+        willSnow,
       });
     } catch {
       // Silently ignore weather failures
@@ -1183,18 +1225,41 @@ function WeatherCard({ weather }: { weather: WeatherData }) {
 
       {/* Info */}
       <div className={`relative z-10 ${tc}`}>
-        <p className="mb-3 text-[10px] font-black uppercase tracking-widest opacity-60">
-          {timeLabel}
-        </p>
+        {/* Location + time */}
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-xs font-black opacity-70">📍 {weather.locationName}</p>
+          <p className="text-[10px] font-black uppercase tracking-widest opacity-50">{timeLabel}</p>
+        </div>
+
+        {/* Temp + wind */}
         <div className="flex items-end justify-between">
           <div>
             <p className="text-5xl font-black leading-none">{weather.temp}°</p>
-            <p className="mt-2 text-sm font-bold opacity-80">{weather.label}</p>
+            <p className="mt-1.5 text-sm font-bold opacity-80">{weather.label}</p>
           </div>
-          <div className={`text-right text-xs font-bold opacity-60 ${tc}`}>
-            <p>💨 {weather.windSpeed} m/s</p>
-          </div>
+          <p className="text-xs font-bold opacity-60">💨 {weather.windSpeed} m/s</p>
         </div>
+
+        {/* Clothing tip */}
+        <div className={`mt-4 rounded-xl px-3 py-2 text-xs font-bold ${isDark ? "bg-white/15" : "bg-black/8"}`}>
+          👔 {
+            weather.temp >= 28 ? "민소매 · 반팔 · 반바지"
+            : weather.temp >= 23 ? "반팔 · 얇은 면바지"
+            : weather.temp >= 20 ? "얇은 가디건 · 긴팔"
+            : weather.temp >= 17 ? "맨투맨 · 후드 · 얇은 자켓"
+            : weather.temp >= 12 ? "자켓 · 가디건 · 청바지"
+            : weather.temp >= 9  ? "트렌치코트 · 니트"
+            : weather.temp >= 5  ? "울 코트 · 히트텍 · 레이어드"
+            : "패딩 · 두꺼운 코트 · 목도리 · 장갑"
+          }
+        </div>
+
+        {/* Rain / snow warning */}
+        {(weather.willRain || weather.willSnow) && (
+          <div className="mt-2 rounded-xl bg-yellow-400/90 px-3 py-2 text-xs font-bold text-yellow-900">
+            {weather.willSnow ? "🌨 오늘 눈 예보 — 미끄럼 주의!" : "☂️ 오늘 비 예보 — 우산을 챙기세요!"}
+          </div>
+        )}
       </div>
     </div>
   );
