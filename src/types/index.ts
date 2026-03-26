@@ -76,5 +76,16 @@ export interface Restaurant {
   rating: number;
   walkMinutes: number;
   teamId: string;
+  workLocationId?: string;
+  createdAt: number;
+}
+
+export interface WorkLocation {
+  id: string;
+  name: string;
+  address: string;
+  lat: number;
+  lon: number;
+  teamId: string;
   createdAt: number;
 }

@@ -1,5 +1,9 @@
 "use client";
 
+declare global {
+  interface Window { kakao: any; }
+}
+
 import {
   CalendarDays,
   Check,
@@ -10,6 +14,7 @@ import {
   Loader2,
   Lock,
   Bell,
+  MapPin,
   Megaphone,
   Pin,
   PinOff,
@@ -23,7 +28,7 @@ import {
   X,
 } from "lucide-react";
 import Image from "next/image";
-import { startTransition, useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import {
   collection,
   deleteDoc,
@@ -60,6 +65,7 @@ import type {
   Restaurant,
   Team,
   UserStatus,
+  WorkLocation,
 } from "@/types";
 
 type AdminConsoleProps = {
@@ -72,6 +78,7 @@ type AdminPageKey =
   | "members"
   | "admins"
   | "teams"
+  | "worklocations"
   | "notices"
   | "restaurants"
   | "polls"
@@ -110,11 +117,12 @@ const STATUS_COLORS: Record<string, string> = {
   rejected: "bg-slate-100 text-slate-500",
 };
 
-const PERMISSION_MENU_KEYS: AdminPageKey[] = ["members", "admins", "teams", "notices", "restaurants", "polls", "calendar"];
+const PERMISSION_MENU_KEYS: AdminPageKey[] = ["members", "admins", "teams", "worklocations", "notices", "restaurants", "polls", "calendar"];
 const PERMISSION_LABELS: Record<string, string> = {
   members: "프론트 회원 관리",
   admins: "관리자 관리",
   teams: "팀 제어",
+  worklocations: "근무지 관리",
   notices: "공지사항",
   restaurants: "맛집 관리",
   polls: "투표 관리",
@@ -131,6 +139,7 @@ const NAV_ITEMS: {
   { key: "members", label: "프론트 회원 관리", icon: Users, group: "management" },
   { key: "admins", label: "관리자 관리", icon: UserCog, group: "management" },
   { key: "teams", label: "팀 및 기능 제어", icon: Layers3, group: "management" },
+  { key: "worklocations", label: "근무지 관리", icon: MapPin, group: "content" },
   { key: "notices", label: "공지사항 관리", icon: Megaphone, group: "content" },
   { key: "restaurants", label: "맛집 데이터 관리", icon: Utensils, group: "content" },
   { key: "polls", label: "투표 관리", icon: CheckSquare, group: "content" },
@@ -166,7 +175,14 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
   const [teams, setTeams] = useState<Team[]>([]);
   const [frontUsers, setFrontUsers] = useState<FrontUser[]>([]);
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [workLocations, setWorkLocations] = useState<WorkLocation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Work location form
+  const [showWorkLocationForm, setShowWorkLocationForm] = useState(false);
+  const [workLocationForm, setWorkLocationForm] = useState({ name: "", address: "" });
+  const [geoSearching, setGeoSearching] = useState(false);
+  const [previewCoords, setPreviewCoords] = useState<{ lat: number; lon: number } | null>(null);
 
   // Content data
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -193,6 +209,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
     category: "한식",
     rating: "4.5",
     walkMinutes: "5",
+    workLocationId: "",
   });
 
   // Poll form
@@ -220,16 +237,16 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
   // Load management data on mount
   async function refreshData() {
     const { db } = getFirebaseClient();
-    const [teamSnapshot, frontSnapshot, adminSnapshot] = await Promise.all([
+    const [teamSnapshot, frontSnapshot, adminSnapshot, wlSnapshot] = await Promise.all([
       getDocs(query(collection(db, "teams"), orderBy("name"))),
       getDocs(query(collection(db, "frontUsers"), orderBy("createdAt", "desc"))),
       getDocs(query(collection(db, "adminUsers"), orderBy("createdAt", "desc"))),
+      getDocs(query(collection(db, "workLocations"), orderBy("createdAt", "desc"))),
     ]);
-    setTeams(
-      teamSnapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Team, "id">) })),
-    );
+    setTeams(teamSnapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Team, "id">) })));
     setFrontUsers(frontSnapshot.docs.map((d) => d.data() as FrontUser));
     setAdminUsers(adminSnapshot.docs.map((d) => d.data() as AdminUser));
+    setWorkLocations(wlSnapshot.docs.map((d) => d.data() as WorkLocation));
   }
 
   useEffect(() => {
@@ -385,6 +402,78 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
       );
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "상태 변경에 실패했습니다.");
+    } finally {
+      setBusyKey("");
+    }
+  }
+
+  function loadKakaoSdk(callback: () => void) {
+    if (window.kakao?.maps) { callback(); return; }
+    const existing = document.querySelector("[data-kakao-sdk]");
+    if (existing) { existing.addEventListener("load", () => window.kakao.maps.load(callback)); return; }
+    const script = document.createElement("script");
+    script.setAttribute("data-kakao-sdk", "true");
+    script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_KEY}&libraries=services&autoload=false`;
+    script.addEventListener("load", () => window.kakao.maps.load(callback));
+    document.head.appendChild(script);
+  }
+
+  function geocodeAddress(address: string, onSuccess: (lat: number, lon: number) => void, onFail: () => void) {
+    setGeoSearching(true);
+    loadKakaoSdk(() => {
+      const geocoder = new window.kakao.maps.services.Geocoder();
+      geocoder.addressSearch(address, (result: any[], status: any) => {
+        setGeoSearching(false);
+        if (status === window.kakao.maps.services.Status.OK && result.length > 0) {
+          onSuccess(parseFloat(result[0].y), parseFloat(result[0].x));
+        } else {
+          onFail();
+        }
+      });
+    });
+  }
+
+  async function addWorkLocation(lat: number, lon: number) {
+    if (!workLocationForm.name.trim() || !workLocationForm.address.trim()) {
+      setActionError("근무지 이름과 주소를 입력해주세요.");
+      return;
+    }
+    setBusyKey("wl-add");
+    clearMessages();
+    try {
+      const { db } = getFirebaseClient();
+      const docRef = doc(collection(db, "workLocations"));
+      await setDoc(docRef, {
+        id: docRef.id,
+        name: workLocationForm.name.trim(),
+        address: workLocationForm.address.trim(),
+        lat,
+        lon,
+        teamId,
+        createdAt: Date.now(),
+      });
+      setWorkLocationForm({ name: "", address: "" });
+      setPreviewCoords(null);
+      setShowWorkLocationForm(false);
+      await refreshData();
+      setActionMessage("근무지가 등록되었습니다.");
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "근무지 등록에 실패했습니다.");
+    } finally {
+      setBusyKey("");
+    }
+  }
+
+  async function deleteWorkLocation(id: string) {
+    setBusyKey(`wl-del:${id}`);
+    clearMessages();
+    try {
+      const { db } = getFirebaseClient();
+      await deleteDoc(doc(db, "workLocations", id));
+      await refreshData();
+      setActionMessage("근무지가 삭제되었습니다.");
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "삭제에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -587,9 +676,10 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
         rating,
         walkMinutes,
         teamId,
+        workLocationId: restaurantForm.workLocationId || "",
         createdAt: Date.now(),
       });
-      setRestaurantForm({ name: "", category: "한식", rating: "4.5", walkMinutes: "5" });
+      setRestaurantForm({ name: "", category: "한식", rating: "4.5", walkMinutes: "5", workLocationId: "" });
       setShowRestaurantForm(false);
       await loadRestaurants();
       setActionMessage("맛집이 등록되었습니다.");
@@ -1133,6 +1223,98 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
     );
   }
 
+  function renderWorkLocations() {
+    return (
+      <div className="max-w-4xl space-y-6">
+        <div className="flex items-center justify-between">
+          <h3 className="text-2xl font-black">근무지 관리</h3>
+          <button
+            onClick={() => { setShowWorkLocationForm((v) => !v); setPreviewCoords(null); clearMessages(); }}
+            className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm"
+          >
+            {showWorkLocationForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {showWorkLocationForm ? "취소" : "근무지 추가"}
+          </button>
+        </div>
+
+        {showWorkLocationForm && (
+          <div className="rounded-[2rem] border border-indigo-100 bg-indigo-50 p-8 space-y-4">
+            <h4 className="font-bold text-indigo-700">새 근무지 등록</h4>
+            <input
+              type="text"
+              placeholder="근무지 이름 (예: 본사, 강남 오피스)"
+              value={workLocationForm.name}
+              onChange={(e) => setWorkLocationForm((f) => ({ ...f, name: e.target.value }))}
+              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400"
+            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="주소 검색 (예: 서울 강남구 테헤란로 152)"
+                value={workLocationForm.address}
+                onChange={(e) => setWorkLocationForm((f) => ({ ...f, address: e.target.value }))}
+                className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400"
+              />
+              <button
+                onClick={() => {
+                  if (!workLocationForm.address.trim()) { setActionError("주소를 입력해주세요."); return; }
+                  geocodeAddress(
+                    workLocationForm.address,
+                    (lat, lon) => setPreviewCoords({ lat, lon }),
+                    () => setActionError("주소를 찾을 수 없습니다. 더 구체적으로 입력해주세요."),
+                  );
+                }}
+                disabled={geoSearching}
+                className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {geoSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+                지도 확인
+              </button>
+            </div>
+
+            {previewCoords && (
+              <>
+                <KakaoMapView lat={previewCoords.lat} lon={previewCoords.lon} name={workLocationForm.name || "근무지"} height="200px" />
+                <button
+                  onClick={() => startTransition(() => void addWorkLocation(previewCoords.lat, previewCoords.lon))}
+                  disabled={busyKey === "wl-add"}
+                  className="flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white disabled:opacity-50"
+                >
+                  {busyKey === "wl-add" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  저장하기
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        <div className="space-y-4">
+          {workLocations.map((wl) => (
+            <div key={wl.id} className="overflow-hidden rounded-[2rem] border border-gray-100 bg-white shadow-sm">
+              <div className="flex items-center justify-between p-6">
+                <div>
+                  <p className="font-bold text-slate-900">{wl.name}</p>
+                  <p className="mt-1 flex items-center gap-1 text-xs text-slate-400">
+                    <MapPin className="h-3 w-3" /> {wl.address}
+                  </p>
+                </div>
+                <button
+                  onClick={() => { if (window.confirm(`"${wl.name}" 근무지를 삭제할까요?`)) startTransition(() => void deleteWorkLocation(wl.id)); }}
+                  disabled={busyKey !== ""}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 text-slate-300 hover:bg-red-50 hover:text-red-500"
+                >
+                  {busyKey === `wl-del:${wl.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                </button>
+              </div>
+              <KakaoMapView lat={wl.lat} lon={wl.lon} name={wl.name} height="180px" />
+            </div>
+          ))}
+          {workLocations.length === 0 && <EmptyState text="등록된 근무지가 없습니다." />}
+        </div>
+      </div>
+    );
+  }
+
   function renderTeams() {
     return (
       <div className="max-w-6xl space-y-8">
@@ -1427,10 +1609,20 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
                 className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400"
               />
             </div>
+            <select
+              value={restaurantForm.workLocationId}
+              onChange={(e) => setRestaurantForm((f) => ({ ...f, workLocationId: e.target.value }))}
+              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400 md:col-span-2"
+            >
+              <option value="">근무지 선택 (선택 안 하면 전체 공통)</option>
+              {workLocations.map((wl) => (
+                <option key={wl.id} value={wl.id}>{wl.name}</option>
+              ))}
+            </select>
             <button
               onClick={() => startTransition(() => void addRestaurant())}
               disabled={busyKey === "restaurant-add"}
-              className="flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white disabled:opacity-50"
+              className="flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white disabled:opacity-50 md:col-span-2"
             >
               {busyKey === "restaurant-add" ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -1456,6 +1648,12 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
                   <p className="mt-1 text-xs font-medium text-slate-400">
                     {r.category} · ⭐ {r.rating} · 도보 {r.walkMinutes}분
                   </p>
+                  {r.workLocationId && (
+                    <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-600">
+                      <MapPin className="h-2.5 w-2.5" />
+                      {workLocations.find((wl) => wl.id === r.workLocationId)?.name ?? r.workLocationId}
+                    </span>
+                  )}
                 </div>
                 <button
                   onClick={() => startTransition(() => void deleteRestaurant(r.id))}
@@ -1857,6 +2055,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
             {!isLoading && activePage === "dashboard" ? renderDashboard() : null}
             {!isLoading && activePage === "members" ? renderMembers() : null}
             {!isLoading && activePage === "admins" ? renderAdmins() : null}
+            {!isLoading && activePage === "worklocations" ? renderWorkLocations() : null}
             {!isLoading && activePage === "teams" ? renderTeams() : null}
             {!isLoading && activePage === "notices" ? renderNotices() : null}
             {!isLoading && activePage === "restaurants" ? renderRestaurants() : null}
@@ -1915,4 +2114,46 @@ function EmptyState({ text }: { text: string }) {
       {text}
     </div>
   );
+}
+
+function KakaoMapView({ lat, lon, name, height = "180px" }: { lat: number; lon: number; name?: string; height?: string }) {
+  const mapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY;
+    if (!appKey || !mapRef.current) return;
+    const el = mapRef.current;
+
+    function initMap() {
+      if (!el) return;
+      window.kakao.maps.load(() => {
+        const center = new window.kakao.maps.LatLng(lat, lon);
+        const map = new window.kakao.maps.Map(el, { center, level: 4 });
+        const marker = new window.kakao.maps.Marker({ position: center, map });
+        if (name) {
+          const info = new window.kakao.maps.InfoWindow({
+            content: `<div style="padding:5px 10px;font-size:12px;font-weight:bold;white-space:nowrap;">${name}</div>`,
+          });
+          info.open(map, marker);
+        }
+      });
+    }
+
+    if (window.kakao?.maps) {
+      initMap();
+    } else {
+      const existing = document.querySelector("[data-kakao-sdk]");
+      if (existing) {
+        existing.addEventListener("load", initMap);
+        return () => existing.removeEventListener("load", initMap);
+      }
+      const script = document.createElement("script");
+      script.setAttribute("data-kakao-sdk", "true");
+      script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${appKey}&libraries=services&autoload=false`;
+      script.addEventListener("load", initMap);
+      document.head.appendChild(script);
+    }
+  }, [lat, lon, name]);
+
+  return <div ref={mapRef} className="w-full" style={{ height }} />;
 }

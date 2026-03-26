@@ -31,7 +31,7 @@ import { signOut } from "firebase/auth";
 
 import { getFirebaseClient } from "@/lib/firebase/config";
 import { clearClientSession, SESSION_COOKIE_KEYS } from "@/lib/session";
-import type { CalendarEvent, Notice, Poll, Restaurant } from "@/types";
+import type { CalendarEvent, Notice, Poll, Restaurant, WorkLocation } from "@/types";
 
 type TabId = "home" | "calendar" | "lunch" | "vote";
 
@@ -128,6 +128,10 @@ export default function DashboardPage() {
   // Weather
   const [weather, setWeather] = useState<WeatherData | null>(null);
 
+  // Work locations
+  const [workLocations, setWorkLocations] = useState<WorkLocation[]>([]);
+  const [selectedWorkLocationId, setSelectedWorkLocationId] = useState<string>("");
+
   // Notice detail modal
   const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
 
@@ -185,7 +189,7 @@ export default function DashboardPage() {
   // Refresh tab-specific data on tab change
   useEffect(() => {
     if (!teamId) return;
-    if (activeTab === "lunch") void fetchRestaurants();
+    if (activeTab === "lunch") { void fetchRestaurants(); void fetchWorkLocations(); }
     if (activeTab === "home") void fetchNotices();
     if (activeTab === "calendar") void fetchCalendarEvents();
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -199,6 +203,7 @@ export default function DashboardPage() {
         fetchNotices(),
         fetchCalendarEvents(),
         fetchRestaurants(),
+        fetchWorkLocations(),
         fetchWeather(),
       ]);
     } catch (err) {
@@ -339,6 +344,16 @@ export default function DashboardPage() {
     setRestaurants(list);
   }
 
+  async function fetchWorkLocations() {
+    const { db } = getFirebaseClient();
+    const snap = await getDocs(
+      query(collection(db, "workLocations"), where("teamId", "==", teamId)),
+    );
+    const list = snap.docs.map((d) => d.data() as WorkLocation);
+    list.sort((a, b) => a.createdAt - b.createdAt);
+    setWorkLocations(list);
+  }
+
   async function checkVotedPolls(pollList: Poll[]) {
     const { db } = getFirebaseClient();
     const results: Record<string, string> = {};
@@ -408,7 +423,11 @@ export default function DashboardPage() {
   }
 
   function pickLunch() {
-    const pool = restaurants.length > 0 ? restaurants : FALLBACK_RESTAURANTS;
+    const filtered =
+      selectedWorkLocationId
+        ? restaurants.filter((r) => r.workLocationId === selectedWorkLocationId)
+        : restaurants;
+    const pool = filtered.length > 0 ? filtered : (restaurants.length > 0 ? restaurants : FALLBACK_RESTAURANTS);
     setIsPickingLunch(true);
     setPickedLunch(null);
     window.setTimeout(() => {
@@ -705,10 +724,54 @@ export default function DashboardPage() {
                     <Utensils className={`h-9 w-9 ${isPickingLunch ? "animate-bounce" : ""}`} />
                   </div>
                   <h3 className="mb-4 text-2xl font-black leading-tight">오늘의 점심 룰렛</h3>
+
+                  {/* Work location selector */}
+                  {workLocations.length > 0 && (
+                    <div className="mb-8">
+                      <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        근무지 선택
+                      </p>
+                      <div className="flex flex-wrap justify-center gap-2">
+                        <button
+                          onClick={() => { setSelectedWorkLocationId(""); setPickedLunch(null); }}
+                          className={`rounded-full px-4 py-2 text-xs font-bold transition-all ${
+                            selectedWorkLocationId === ""
+                              ? "bg-orange-500 text-white shadow-md shadow-orange-100"
+                              : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                          }`}
+                        >
+                          전체
+                        </button>
+                        {workLocations.map((loc) => (
+                          <button
+                            key={loc.id}
+                            onClick={() => { setSelectedWorkLocationId(loc.id); setPickedLunch(null); }}
+                            className={`rounded-full px-4 py-2 text-xs font-bold transition-all ${
+                              selectedWorkLocationId === loc.id
+                                ? "bg-orange-500 text-white shadow-md shadow-orange-100"
+                                : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                            }`}
+                          >
+                            {loc.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <p className="mb-12 text-sm font-medium leading-relaxed text-slate-400">
-                    {restaurants.length > 0
-                      ? `팀 맛집 ${restaurants.length}곳 중에서 오늘 점심을 골라드립니다.`
-                      : "등록된 맛집이 없어 기본 추천 목록을 사용합니다."}
+                    {(() => {
+                      const filtered = selectedWorkLocationId
+                        ? restaurants.filter((r) => r.workLocationId === selectedWorkLocationId)
+                        : restaurants;
+                      if (filtered.length > 0) {
+                        const locName = workLocations.find((l) => l.id === selectedWorkLocationId)?.name;
+                        return locName
+                          ? `${locName} 맛집 ${filtered.length}곳 중에서 골라드립니다.`
+                          : `팀 맛집 ${filtered.length}곳 중에서 오늘 점심을 골라드립니다.`;
+                      }
+                      return "등록된 맛집이 없어 기본 추천 목록을 사용합니다.";
+                    })()}
                   </p>
 
                   {pickedLunch && (
@@ -733,26 +796,34 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Restaurant list */}
-                {restaurants.length > 0 && (
-                  <div className="mx-auto mt-12 max-w-md">
-                    <p className="mb-4 text-center text-[10px] font-black uppercase tracking-widest text-slate-300">
-                      팀 맛집 목록
-                    </p>
-                    <div className="space-y-3">
-                      {restaurants.map((r) => (
-                        <div
-                          key={r.id}
-                          className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4"
-                        >
-                          <span className="text-sm font-bold text-slate-700">{r.name}</span>
-                          <span className="text-xs font-medium text-slate-400">
-                            {r.category} · ⭐ {r.rating} · {r.walkMinutes}분
-                          </span>
-                        </div>
-                      ))}
+                {(() => {
+                  const visible = selectedWorkLocationId
+                    ? restaurants.filter((r) => r.workLocationId === selectedWorkLocationId)
+                    : restaurants;
+                  if (visible.length === 0) return null;
+                  return (
+                    <div className="mx-auto mt-12 max-w-md">
+                      <p className="mb-4 text-center text-[10px] font-black uppercase tracking-widest text-slate-300">
+                        {selectedWorkLocationId
+                          ? `${workLocations.find((l) => l.id === selectedWorkLocationId)?.name ?? ""} 맛집 목록`
+                          : "팀 맛집 목록"}
+                      </p>
+                      <div className="space-y-3">
+                        {visible.map((r) => (
+                          <div
+                            key={r.id}
+                            className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4"
+                          >
+                            <span className="text-sm font-bold text-slate-700">{r.name}</span>
+                            <span className="text-xs font-medium text-slate-400">
+                              {r.category} · ⭐ {r.rating} · {r.walkMinutes}분
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </section>
             )}
 
