@@ -210,7 +210,10 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
     rating: "4.5",
     walkMinutes: "5",
     workLocationId: "",
+    address: "",
   });
+  const [restaurantGeoSearching, setRestaurantGeoSearching] = useState(false);
+  const [restaurantPreviewCoords, setRestaurantPreviewCoords] = useState<{ lat: number; lon: number } | null>(null);
 
   // Poll form
   const [showPollForm, setShowPollForm] = useState(false);
@@ -671,9 +674,12 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
         walkMinutes,
         teamId,
         workLocationId: restaurantForm.workLocationId || "",
+        address: restaurantForm.address.trim() || "",
+        ...(restaurantPreviewCoords ? { lat: restaurantPreviewCoords.lat, lon: restaurantPreviewCoords.lon } : {}),
         createdAt: Date.now(),
       });
-      setRestaurantForm({ name: "", category: "한식", rating: "4.5", walkMinutes: "5", workLocationId: "" });
+      setRestaurantForm({ name: "", category: "한식", rating: "4.5", walkMinutes: "5", workLocationId: "", address: "" });
+      setRestaurantPreviewCoords(null);
       setShowRestaurantForm(false);
       await loadRestaurants();
       setActionMessage("맛집이 등록되었습니다.");
@@ -1557,70 +1563,132 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
         </div>
 
         {showRestaurantForm && (
-          <div className="rounded-[2rem] border border-indigo-100 bg-indigo-50 p-8 space-y-4">
+          <div className="rounded-[2rem] border border-indigo-100 bg-indigo-50 p-8 space-y-5">
             <h4 className="font-bold text-indigo-700">새 맛집 등록</h4>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <input
-                type="text"
-                placeholder="식당 이름"
-                value={restaurantForm.name}
-                onChange={(e) =>
-                  setRestaurantForm((f) => ({ ...f, name: e.target.value }))
-                }
-                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400"
-              />
+
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              {/* 식당 이름 */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500">식당 이름 *</label>
+                <input
+                  type="text"
+                  placeholder="예: 강남 순대국밥"
+                  value={restaurantForm.name}
+                  onChange={(e) => setRestaurantForm((f) => ({ ...f, name: e.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400"
+                />
+              </div>
+
+              {/* 카테고리 */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500">카테고리</label>
+                <select
+                  value={restaurantForm.category}
+                  onChange={(e) => setRestaurantForm((f) => ({ ...f, category: e.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400"
+                >
+                  {CATEGORY_OPTIONS.map((c) => (
+                    <option key={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 평점 */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500">평점 (0 ~ 5)</label>
+                <input
+                  type="number"
+                  placeholder="4.5"
+                  min="0"
+                  max="5"
+                  step="0.1"
+                  value={restaurantForm.rating}
+                  onChange={(e) => setRestaurantForm((f) => ({ ...f, rating: e.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400"
+                />
+              </div>
+
+              {/* 도보 시간 */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500">근무지에서 도보 시간 (분)</label>
+                <input
+                  type="number"
+                  placeholder="5"
+                  min="1"
+                  value={restaurantForm.walkMinutes}
+                  onChange={(e) => setRestaurantForm((f) => ({ ...f, walkMinutes: e.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400"
+                />
+              </div>
+            </div>
+
+            {/* 근무지 */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-500">근무지</label>
               <select
-                value={restaurantForm.category}
-                onChange={(e) =>
-                  setRestaurantForm((f) => ({ ...f, category: e.target.value }))
-                }
+                value={restaurantForm.workLocationId}
+                onChange={(e) => setRestaurantForm((f) => ({ ...f, workLocationId: e.target.value }))}
                 className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400"
               >
-                {CATEGORY_OPTIONS.map((c) => (
-                  <option key={c}>{c}</option>
+                <option value="">전체 공통 (근무지 무관)</option>
+                {workLocations.map((wl) => (
+                  <option key={wl.id} value={wl.id}>{wl.name}</option>
                 ))}
               </select>
-              <input
-                type="number"
-                placeholder="평점 (0~5)"
-                min="0"
-                max="5"
-                step="0.1"
-                value={restaurantForm.rating}
-                onChange={(e) =>
-                  setRestaurantForm((f) => ({ ...f, rating: e.target.value }))
-                }
-                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400"
-              />
-              <input
-                type="number"
-                placeholder="도보 시간 (분)"
-                min="1"
-                value={restaurantForm.walkMinutes}
-                onChange={(e) =>
-                  setRestaurantForm((f) => ({ ...f, walkMinutes: e.target.value }))
-                }
-                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400"
-              />
             </div>
-            <select
-              value={restaurantForm.workLocationId}
-              onChange={(e) => setRestaurantForm((f) => ({ ...f, workLocationId: e.target.value }))}
-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400 md:col-span-2"
-            >
-              <option value="">근무지 선택 (선택 안 하면 전체 공통)</option>
-              {workLocations.map((wl) => (
-                <option key={wl.id} value={wl.id}>{wl.name}</option>
-              ))}
-            </select>
+
+            {/* 주소 + 지도 */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-500">주소 (지도 표시용)</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="예: 서울 강남구 테헤란로 152"
+                  value={restaurantForm.address}
+                  onChange={(e) => { setRestaurantForm((f) => ({ ...f, address: e.target.value })); setRestaurantPreviewCoords(null); }}
+                  className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400"
+                />
+                <button
+                  onClick={() => {
+                    if (!restaurantForm.address.trim()) { setActionError("주소를 입력해주세요."); return; }
+                    void (async () => {
+                      setRestaurantGeoSearching(true);
+                      try {
+                        const res = await fetch(
+                          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(restaurantForm.address)}&format=json&limit=1&accept-language=ko`,
+                          { headers: { "User-Agent": "company-life-helper-app" } },
+                        );
+                        const data = (await res.json()) as { lat: string; lon: string }[];
+                        if (data.length > 0) {
+                          setRestaurantPreviewCoords({ lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) });
+                        } else {
+                          setActionError("주소를 찾을 수 없습니다. 더 구체적으로 입력해주세요.");
+                        }
+                      } catch {
+                        setActionError("주소 검색에 실패했습니다.");
+                      } finally {
+                        setRestaurantGeoSearching(false);
+                      }
+                    })();
+                  }}
+                  disabled={restaurantGeoSearching}
+                  className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
+                >
+                  {restaurantGeoSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+                  지도 확인
+                </button>
+              </div>
+              {restaurantPreviewCoords && (
+                <KakaoMapView lat={restaurantPreviewCoords.lat} lon={restaurantPreviewCoords.lon} name={restaurantForm.name || "맛집"} height="200px" />
+              )}
+            </div>
+
             <button
               onClick={() => startTransition(() => void addRestaurant())}
               disabled={busyKey === "restaurant-add"}
-              className="flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white disabled:opacity-50 md:col-span-2"
+              className="flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white disabled:opacity-50"
             >
-              {busyKey === "restaurant-add" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : null}
+              {busyKey === "restaurant-add" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               저장하기
             </button>
           </div>
@@ -1642,6 +1710,11 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
                   <p className="mt-1 text-xs font-medium text-slate-400">
                     {r.category} · ⭐ {r.rating} · 도보 {r.walkMinutes}분
                   </p>
+                  {r.address && (
+                    <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-400">
+                      <MapPin className="h-2.5 w-2.5 shrink-0" />{r.address}
+                    </p>
+                  )}
                   {r.workLocationId && (
                     <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-600">
                       <MapPin className="h-2.5 w-2.5" />

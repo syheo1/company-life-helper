@@ -1,5 +1,7 @@
 "use client";
 
+declare global { interface Window { kakao: any; } }
+
 import {
   Bell,
   CalendarDays,
@@ -775,14 +777,22 @@ export default function DashboardPage() {
                   </p>
 
                   {pickedLunch && (
-                    <div className="mb-12 rounded-[2rem] border-2 border-dashed border-orange-200 bg-orange-50 p-8">
-                      <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-orange-500">
-                        오늘의 메뉴
-                      </span>
-                      <h4 className="text-3xl font-black text-slate-900">{pickedLunch.name}</h4>
-                      <p className="mt-2 text-sm font-bold text-slate-500">
-                        {pickedLunch.category} · ⭐ {pickedLunch.rating} · 도보 {pickedLunch.walkMinutes}분
-                      </p>
+                    <div className="mb-12 overflow-hidden rounded-[2rem] border-2 border-dashed border-orange-200 bg-orange-50">
+                      <div className="p-8">
+                        <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-orange-500">
+                          오늘의 메뉴
+                        </span>
+                        <h4 className="text-3xl font-black text-slate-900">{pickedLunch.name}</h4>
+                        <p className="mt-2 text-sm font-bold text-slate-500">
+                          {pickedLunch.category} · ⭐ {pickedLunch.rating} · 도보 {pickedLunch.walkMinutes}분
+                        </p>
+                        {pickedLunch.address && (
+                          <p className="mt-1 text-xs text-slate-400">{pickedLunch.address}</p>
+                        )}
+                      </div>
+                      {pickedLunch.lat && pickedLunch.lon && (
+                        <RestaurantMapView lat={pickedLunch.lat} lon={pickedLunch.lon} name={pickedLunch.name} />
+                      )}
                     </div>
                   )}
 
@@ -1139,6 +1149,50 @@ export default function DashboardPage() {
       </section>
     </main>
   );
+}
+
+function RestaurantMapView({ lat, lon, name }: { lat: number; lon: number; name: string }) {
+  const mapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY;
+    if (!appKey || !mapRef.current) return;
+    const el = mapRef.current;
+
+    function initMap() {
+      window.kakao.maps.load(() => {
+        const center = new window.kakao.maps.LatLng(lat, lon);
+        const map = new window.kakao.maps.Map(el, { center, level: 4 });
+        const marker = new window.kakao.maps.Marker({ position: center, map });
+        const info = new window.kakao.maps.InfoWindow({
+          content: `<div style="padding:5px 10px;font-size:12px;font-weight:bold;white-space:nowrap;">${name}</div>`,
+        });
+        info.open(map, marker);
+      });
+    }
+
+    if (window.kakao?.maps) {
+      initMap();
+    } else {
+      const existing = document.querySelector<HTMLScriptElement>("[data-kakao-sdk]");
+      if (existing) {
+        if (existing.dataset.loaded === "true") {
+          initMap();
+        } else {
+          existing.addEventListener("load", initMap);
+          return () => existing.removeEventListener("load", initMap);
+        }
+      } else {
+        const script = document.createElement("script");
+        script.setAttribute("data-kakao-sdk", "true");
+        script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${appKey}&autoload=false`;
+        script.addEventListener("load", () => { script.dataset.loaded = "true"; initMap(); });
+        document.head.appendChild(script);
+      }
+    }
+  }, [lat, lon, name]);
+
+  return <div ref={mapRef} className="h-48 w-full" />;
 }
 
 function WeatherCard({ weather }: { weather: WeatherData }) {
