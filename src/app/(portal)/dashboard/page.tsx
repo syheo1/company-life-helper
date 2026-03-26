@@ -926,7 +926,7 @@ export default function DashboardPage() {
             onClick={() => setSelectedNotice(null)}
           >
             <div
-              className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[2.5rem] bg-white shadow-2xl"
+              className="modal-scroll relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[2.5rem] bg-white shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-[2.5rem] bg-white/90 px-8 py-6 backdrop-blur">
