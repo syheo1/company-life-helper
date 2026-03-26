@@ -12,6 +12,7 @@ import {
   Shield,
   Sparkles,
   Utensils,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -118,6 +119,9 @@ export default function DashboardPage() {
 
   // Weather
   const [weather, setWeather] = useState<WeatherData | null>(null);
+
+  // Notice detail modal
+  const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
 
   // Loading / voting / error
   const [isLoading, setIsLoading] = useState(true);
@@ -513,7 +517,10 @@ export default function DashboardPage() {
                 <div className="space-y-8 lg:col-span-2">
                   {/* Main notice hero */}
                   {mainNotice ? (
-                    <section className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-blue-600 to-indigo-700 p-8 text-white shadow-2xl shadow-blue-200 lg:p-12">
+                    <section
+                      onClick={() => setSelectedNotice(mainNotice)}
+                      className="relative cursor-pointer overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-blue-600 to-indigo-700 p-8 text-white shadow-2xl shadow-blue-200 transition-transform hover:scale-[1.01] lg:p-12"
+                    >
                       <div className="relative z-10">
                         <span className="mb-4 inline-block rounded-full bg-white/20 px-3 py-1 text-[10px] font-bold uppercase tracking-widest">
                           {mainNotice.isPinned ? "📌 고정 공지" : "공지사항"}
@@ -524,6 +531,9 @@ export default function DashboardPage() {
                         <p className="mb-8 max-w-md text-sm text-blue-100 opacity-90 lg:text-base line-clamp-3">
                           {mainNotice.content}
                         </p>
+                        <span className="inline-block rounded-full bg-white/20 px-4 py-1.5 text-xs font-bold">
+                          자세히 보기 →
+                        </span>
                       </div>
                       <div className="pointer-events-none absolute -bottom-10 -right-10 flex h-48 w-48 items-center justify-center rounded-full bg-white/5 text-white/10">
                         <Bell className="h-28 w-28" />
@@ -546,6 +556,7 @@ export default function DashboardPage() {
                         {recentNotices.map((notice) => (
                           <div
                             key={notice.id}
+                            onClick={() => setSelectedNotice(notice)}
                             className="group flex cursor-pointer items-center justify-between rounded-2xl bg-slate-50 p-4 transition-colors hover:bg-blue-50/50"
                           >
                             <span className="text-sm font-bold text-slate-700 transition-colors group-hover:text-blue-600 line-clamp-1">
@@ -907,6 +918,53 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
+
+        {/* Notice detail modal */}
+        {selectedNotice && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+            onClick={() => setSelectedNotice(null)}
+          >
+            <div
+              className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[2.5rem] bg-white shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-[2.5rem] bg-white/90 px-8 py-6 backdrop-blur">
+                <span className="rounded-full bg-blue-100 px-3 py-1 text-[10px] font-bold text-blue-600">
+                  {selectedNotice.isPinned ? "📌 고정 공지" : "공지사항"}
+                </span>
+                <button
+                  onClick={() => setSelectedNotice(null)}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 transition hover:bg-slate-200"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="px-8 pb-10">
+                <h2 className="mb-3 text-2xl font-black leading-tight text-slate-900">
+                  {selectedNotice.title}
+                </h2>
+                <p className="mb-6 text-[10px] font-bold text-slate-400">
+                  {new Date(selectedNotice.createdAt).toLocaleDateString("ko-KR", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </p>
+                {selectedNotice.imageUrl && (
+                  <img
+                    src={selectedNotice.imageUrl}
+                    alt="공지 이미지"
+                    className="mb-6 w-full rounded-2xl object-cover"
+                  />
+                )}
+                <p className="whitespace-pre-wrap text-sm leading-7 text-slate-600">
+                  {selectedNotice.content}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Mobile bottom nav */}
         <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-20 items-center justify-around border-t border-slate-100 bg-white/90 px-4 pb-4 backdrop-blur-xl lg:hidden">
