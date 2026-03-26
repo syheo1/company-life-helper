@@ -240,16 +240,30 @@ export default function DashboardPage() {
       };
 
       const geoData = (await geoRes.json()) as {
-        address?: { city?: string; town?: string; county?: string; state?: string; suburb?: string };
+        address?: {
+          city?: string;
+          town?: string;
+          county?: string;
+          state?: string;
+          suburb?: string;
+          city_district?: string;
+          borough?: string;
+        };
       };
 
-      const locationName =
+      const city =
         geoData.address?.city ??
         geoData.address?.town ??
-        geoData.address?.suburb ??
-        geoData.address?.county ??
         geoData.address?.state ??
-        "현재 위치";
+        "";
+      const district =
+        geoData.address?.city_district ??
+        geoData.address?.borough ??
+        geoData.address?.county ??
+        "";
+      const locationName =
+        city && district ? `${city} ${district}`
+        : city || district || geoData.address?.suburb || "현재 위치";
 
       // Check next 6 hours for rain/snow
       const nowHour = new Date().getHours();
