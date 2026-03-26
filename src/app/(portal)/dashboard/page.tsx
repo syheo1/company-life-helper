@@ -35,7 +35,7 @@ import type { CalendarEvent, Notice, Poll, Restaurant } from "@/types";
 
 type TabId = "home" | "calendar" | "lunch" | "vote";
 
-type WeatherData = { temp: number; label: string };
+type WeatherData = { temp: number; label: string; code: number; windSpeed: number };
 
 const TAB_TITLES: Record<TabId, string> = {
   home: "Dashboard",
@@ -204,15 +204,28 @@ export default function DashboardPage() {
 
   async function fetchWeather() {
     try {
+      let lat = 37.5665;
+      let lon = 126.978;
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) =>
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 }),
+        );
+        lat = position.coords.latitude;
+        lon = position.coords.longitude;
+      } catch {
+        // Fall back to Seoul
+      }
       const res = await fetch(
-        "https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&current=temperature_2m,weather_code&timezone=Asia%2FSeoul",
+        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m&timezone=auto`,
       );
       const data = (await res.json()) as {
-        current: { temperature_2m: number; weather_code: number };
+        current: { temperature_2m: number; weather_code: number; wind_speed_10m: number };
       };
       setWeather({
         temp: Math.round(data.current.temperature_2m),
         label: WEATHER_CODES[data.current.weather_code] ?? "날씨 정보 없음",
+        code: data.current.weather_code,
+        windSpeed: Math.round(data.current.wind_speed_10m * 10) / 10,
       });
     } catch {
       // Silently ignore weather failures
@@ -576,6 +589,9 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="space-y-8">
+                  {/* Weather card */}
+                  {weather && <WeatherCard weather={weather} />}
+
                   {/* Today's schedule */}
                   <section className="rounded-[2rem] border border-slate-100 bg-white p-8 shadow-sm">
                     <h4 className="mb-6 flex items-center gap-3 text-lg font-bold">
@@ -995,6 +1011,192 @@ export default function DashboardPage() {
         </nav>
       </section>
     </main>
+  );
+}
+
+function WeatherCard({ weather }: { weather: WeatherData }) {
+  const hour = new Date().getHours();
+
+  const timeOfDay =
+    hour >= 5 && hour < 7 ? "dawn"
+    : hour >= 7 && hour < 12 ? "morning"
+    : hour >= 12 && hour < 16 ? "midday"
+    : hour >= 16 && hour < 19 ? "afternoon"
+    : hour >= 19 && hour < 21 ? "sunset"
+    : "night";
+
+  const isNight = timeOfDay === "night";
+
+  const weatherType =
+    weather.code === 0 || weather.code === 1 ? "clear"
+    : weather.code === 2 || weather.code === 3 ? "cloudy"
+    : weather.code >= 45 && weather.code <= 48 ? "fog"
+    : weather.code >= 51 && weather.code <= 57 ? "drizzle"
+    : (weather.code >= 61 && weather.code <= 67) || (weather.code >= 80 && weather.code <= 82) ? "rain"
+    : (weather.code >= 71 && weather.code <= 77) || weather.code === 85 || weather.code === 86 ? "snow"
+    : weather.code >= 95 ? "thunder"
+    : "cloudy";
+
+  const bg =
+    weatherType === "thunder" ? "from-slate-800 via-purple-950 to-slate-900"
+    : weatherType === "rain" ? (isNight ? "from-slate-700 via-blue-950 to-slate-800" : "from-slate-500 via-blue-700 to-slate-600")
+    : weatherType === "drizzle" ? (isNight ? "from-slate-700 to-blue-900" : "from-slate-400 via-blue-600 to-slate-500")
+    : weatherType === "snow" ? (isNight ? "from-slate-700 to-indigo-900" : "from-sky-200 via-slate-200 to-sky-100")
+    : weatherType === "fog" ? "from-slate-400 via-slate-300 to-slate-400"
+    : weatherType === "cloudy" ? (isNight ? "from-slate-700 to-slate-800" : "from-slate-400 via-slate-500 to-blue-500")
+    : timeOfDay === "dawn" ? "from-rose-400 via-orange-300 to-sky-300"
+    : timeOfDay === "morning" ? "from-sky-400 via-blue-400 to-sky-500"
+    : timeOfDay === "midday" ? "from-sky-400 to-blue-500"
+    : timeOfDay === "afternoon" ? "from-amber-400 via-orange-300 to-sky-400"
+    : timeOfDay === "sunset" ? "from-rose-500 via-orange-400 to-purple-500"
+    : "from-indigo-950 via-blue-950 to-slate-900";
+
+  const isDark = weatherType === "snow" && !isNight ? false : true;
+  const tc = isDark ? "text-white" : "text-slate-700";
+
+  const timeLabel =
+    timeOfDay === "dawn" ? "🌅 새벽"
+    : timeOfDay === "morning" ? "🌤 오전"
+    : timeOfDay === "midday" ? "☀️ 낮"
+    : timeOfDay === "afternoon" ? "🌇 오후"
+    : timeOfDay === "sunset" ? "🌆 저녁"
+    : "🌙 야간";
+
+  // Deterministic particle positions (no Math.random — stable across renders)
+  const rainDrops = Array.from({ length: 22 }, (_, i) => ({
+    left: (i * 43 + 7) % 100,
+    delay: ((i * 0.28) % 2).toFixed(2),
+    duration: (0.5 + (i * 0.11) % 0.5).toFixed(2),
+  }));
+  const snowFlakes = Array.from({ length: 14 }, (_, i) => ({
+    left: (i * 67 + 5) % 100,
+    delay: ((i * 0.35) % 3).toFixed(2),
+    duration: (2 + (i * 0.22) % 2).toFixed(2),
+    size: 9 + (i * 3) % 9,
+  }));
+  const stars = Array.from({ length: 22 }, (_, i) => ({
+    left: (i * 41 + 3) % 90,
+    top: (i * 37 + 5) % 60,
+    delay: ((i * 0.4) % 3).toFixed(2),
+    size: 1 + (i % 3),
+  }));
+  const fogStrips = Array.from({ length: 5 }, (_, i) => ({
+    top: 15 + i * 16,
+    delay: ((i * 1.2) % 4).toFixed(2),
+    duration: (5 + i * 1.5).toFixed(1),
+    opacity: 0.5 - i * 0.06,
+  }));
+  const windLines = Array.from({ length: 8 }, (_, i) => ({
+    top: (i * 29 + 10) % 85,
+    left: (i * 53) % 40,
+    width: 30 + (i * 17) % 50,
+    delay: ((i * 0.5) % 3).toFixed(2),
+    duration: (1.5 + (i * 0.3) % 1.5).toFixed(1),
+  }));
+
+  const showClouds = ["cloudy", "rain", "drizzle", "thunder", "fog"].includes(weatherType);
+
+  return (
+    <div className={`relative overflow-hidden rounded-[2rem] bg-gradient-to-br ${bg} p-6 shadow-lg`} style={{ minHeight: "190px" }}>
+      {/* Effects layer */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        {/* Rain */}
+        {(weatherType === "rain" || weatherType === "drizzle" || weatherType === "thunder") &&
+          rainDrops.map((d, i) => (
+            <span
+              key={i}
+              className="weather-rain"
+              style={{ left: `${d.left}%`, animationDelay: `${d.delay}s`, animationDuration: `${d.duration}s`, opacity: weatherType === "drizzle" ? 0.5 : 0.85 }}
+            />
+          ))}
+
+        {/* Snow */}
+        {weatherType === "snow" &&
+          snowFlakes.map((s, i) => (
+            <span
+              key={i}
+              className="weather-snow"
+              style={{ left: `${s.left}%`, animationDelay: `${s.delay}s`, animationDuration: `${s.duration}s`, fontSize: `${s.size}px` }}
+            />
+          ))}
+
+        {/* Lightning */}
+        {weatherType === "thunder" && (
+          <>
+            <span className="weather-lightning" style={{ left: "28%", animationDelay: "0s" }} />
+            <span className="weather-lightning" style={{ left: "62%", animationDelay: "1.8s" }} />
+          </>
+        )}
+
+        {/* Stars */}
+        {isNight && (weatherType === "clear" || weatherType === "cloudy") &&
+          stars.map((s, i) => (
+            <span
+              key={i}
+              className="weather-star"
+              style={{ left: `${s.left}%`, top: `${s.top}%`, animationDelay: `${s.delay}s`, width: `${s.size}px`, height: `${s.size}px` }}
+            />
+          ))}
+
+        {/* Fog strips */}
+        {weatherType === "fog" &&
+          fogStrips.map((f, i) => (
+            <span
+              key={i}
+              className="weather-fog-strip"
+              style={{ top: `${f.top}%`, animationDelay: `${f.delay}s`, animationDuration: `${f.duration}s`, opacity: f.opacity }}
+            />
+          ))}
+
+        {/* Wind lines */}
+        {weather.windSpeed >= 8 &&
+          windLines.map((w, i) => (
+            <span
+              key={i}
+              className="weather-wind"
+              style={{ top: `${w.top}%`, left: `${w.left}%`, width: `${w.width}px`, animationDelay: `${w.delay}s`, animationDuration: `${w.duration}s` }}
+            />
+          ))}
+
+        {/* Clouds */}
+        {showClouds && (
+          <>
+            <div className="weather-cloud" style={{ top: "18%", left: "4%",  width: "110px", animationDelay: "0s",   animationDuration: "7s" }} />
+            <div className="weather-cloud" style={{ top: "28%", left: "42%", width: "86px",  animationDelay: "1.4s", animationDuration: "5.5s" }} />
+            <div className="weather-cloud" style={{ top: "12%", right: "4%", width: "96px",  animationDelay: "0.7s", animationDuration: "6.5s" }} />
+          </>
+        )}
+
+        {/* Celestial objects */}
+        {!showClouds && !["rain","thunder","snow","drizzle"].includes(weatherType) && (
+          isNight ? (
+            <div className="weather-moon" />
+          ) : timeOfDay === "dawn" || timeOfDay === "sunset" ? (
+            <div className="weather-sun-low" />
+          ) : (
+            <div className="weather-sun">
+              <div className="weather-sun-rays" />
+            </div>
+          )
+        )}
+      </div>
+
+      {/* Info */}
+      <div className={`relative z-10 ${tc}`}>
+        <p className="mb-3 text-[10px] font-black uppercase tracking-widest opacity-60">
+          {timeLabel}
+        </p>
+        <div className="flex items-end justify-between">
+          <div>
+            <p className="text-5xl font-black leading-none">{weather.temp}°</p>
+            <p className="mt-2 text-sm font-bold opacity-80">{weather.label}</p>
+          </div>
+          <div className={`text-right text-xs font-bold opacity-60 ${tc}`}>
+            <p>💨 {weather.windSpeed} m/s</p>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
