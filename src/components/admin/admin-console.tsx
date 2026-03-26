@@ -28,7 +28,7 @@ import {
   X,
 } from "lucide-react";
 import Image from "next/image";
-import { startTransition, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import {
   collection,
   deleteDoc,
@@ -2111,66 +2111,17 @@ function EmptyState({ text }: { text: string }) {
 }
 
 function KakaoMapView({ lat, lon, name, height = "180px" }: { lat: number; lon: number; name?: string; height?: string }) {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const [mapFailed, setMapFailed] = useState(false);
-
-  useEffect(() => {
-    const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY;
-    if (!appKey || !mapRef.current) { setMapFailed(true); return; }
-    const el = mapRef.current;
-
-    function initMap() {
-      if (!el || !window.kakao?.maps) { setMapFailed(true); return; }
-      try {
-        window.kakao.maps.load(() => {
-          try {
-            const center = new window.kakao.maps.LatLng(lat, lon);
-            const map = new window.kakao.maps.Map(el, { center, level: 4 });
-            const marker = new window.kakao.maps.Marker({ position: center, map });
-            if (name) {
-              const info = new window.kakao.maps.InfoWindow({
-                content: `<div style="padding:5px 10px;font-size:12px;font-weight:bold;white-space:nowrap;">${name}</div>`,
-              });
-              info.open(map, marker);
-            }
-          } catch { setMapFailed(true); }
-        });
-      } catch { setMapFailed(true); }
-    }
-
-    if (window.kakao?.maps) {
-      initMap();
-    } else {
-      // Check if script tag already exists
-      const existing = document.querySelector<HTMLScriptElement>("[data-kakao-sdk]");
-      if (existing) {
-        // Script might already be loaded (readyState) or still loading
-        if (existing.getAttribute("data-loaded") === "true") {
-          initMap();
-        } else {
-          existing.addEventListener("load", initMap);
-          return () => existing.removeEventListener("load", initMap);
-        }
-      } else {
-        const script = document.createElement("script");
-        script.setAttribute("data-kakao-sdk", "true");
-        script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${appKey}&autoload=false`;
-        script.addEventListener("load", () => { script.setAttribute("data-loaded", "true"); initMap(); });
-        script.addEventListener("error", () => setMapFailed(true));
-        document.head.appendChild(script);
-      }
-    }
-  }, [lat, lon, name]);
-
-  if (mapFailed) {
-    return (
-      <div className="flex w-full items-center justify-center rounded-b-[2rem] bg-slate-100 text-xs text-slate-400" style={{ height }}>
-        <MapPin className="mr-1 h-3 w-3" />
-        {lat.toFixed(5)}, {lon.toFixed(5)}
-        {name && <span className="ml-2 font-bold text-slate-500">{name}</span>}
-      </div>
-    );
-  }
-
-  return <div ref={mapRef} className="w-full" style={{ height }} />;
+  const delta = 0.005;
+  const bbox = `${lon - delta},${lat - delta},${lon + delta},${lat + delta}`;
+  const src = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lon}`;
+  return (
+    <div className="w-full overflow-hidden" style={{ height }}>
+      <iframe
+        src={src}
+        title={name ?? "지도"}
+        className="h-full w-full border-0"
+        loading="lazy"
+      />
+    </div>
+  );
 }
