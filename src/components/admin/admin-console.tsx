@@ -407,30 +407,24 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
     }
   }
 
-  function loadKakaoSdk(callback: () => void) {
-    if (window.kakao?.maps) { callback(); return; }
-    const existing = document.querySelector("[data-kakao-sdk]");
-    if (existing) { existing.addEventListener("load", () => window.kakao.maps.load(callback)); return; }
-    const script = document.createElement("script");
-    script.setAttribute("data-kakao-sdk", "true");
-    script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_KEY}&libraries=services&autoload=false`;
-    script.addEventListener("load", () => window.kakao.maps.load(callback));
-    document.head.appendChild(script);
-  }
-
-  function geocodeAddress(address: string, onSuccess: (lat: number, lon: number) => void, onFail: () => void) {
+  async function geocodeAddress(address: string, onSuccess: (lat: number, lon: number) => void, onFail: () => void) {
     setGeoSearching(true);
-    loadKakaoSdk(() => {
-      const geocoder = new window.kakao.maps.services.Geocoder();
-      geocoder.addressSearch(address, (result: any[], status: any) => {
-        setGeoSearching(false);
-        if (status === window.kakao.maps.services.Status.OK && result.length > 0) {
-          onSuccess(parseFloat(result[0].y), parseFloat(result[0].x));
-        } else {
-          onFail();
-        }
-      });
-    });
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&accept-language=ko`,
+        { headers: { "User-Agent": "company-life-helper-app" } },
+      );
+      const data = (await res.json()) as { lat: string; lon: string }[];
+      if (data.length > 0) {
+        onSuccess(parseFloat(data[0].lat), parseFloat(data[0].lon));
+      } else {
+        onFail();
+      }
+    } catch {
+      onFail();
+    } finally {
+      setGeoSearching(false);
+    }
   }
 
   async function addWorkLocation(lat: number, lon: number) {
@@ -1258,7 +1252,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
               <button
                 onClick={() => {
                   if (!workLocationForm.address.trim()) { setActionError("주소를 입력해주세요."); return; }
-                  geocodeAddress(
+                  void geocodeAddress(
                     workLocationForm.address,
                     (lat, lon) => setPreviewCoords({ lat, lon }),
                     () => setActionError("주소를 찾을 수 없습니다. 더 구체적으로 입력해주세요."),
@@ -2118,42 +2112,65 @@ function EmptyState({ text }: { text: string }) {
 
 function KakaoMapView({ lat, lon, name, height = "180px" }: { lat: number; lon: number; name?: string; height?: string }) {
   const mapRef = useRef<HTMLDivElement>(null);
+  const [mapFailed, setMapFailed] = useState(false);
 
   useEffect(() => {
     const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY;
-    if (!appKey || !mapRef.current) return;
+    if (!appKey || !mapRef.current) { setMapFailed(true); return; }
     const el = mapRef.current;
 
     function initMap() {
-      if (!el) return;
-      window.kakao.maps.load(() => {
-        const center = new window.kakao.maps.LatLng(lat, lon);
-        const map = new window.kakao.maps.Map(el, { center, level: 4 });
-        const marker = new window.kakao.maps.Marker({ position: center, map });
-        if (name) {
-          const info = new window.kakao.maps.InfoWindow({
-            content: `<div style="padding:5px 10px;font-size:12px;font-weight:bold;white-space:nowrap;">${name}</div>`,
-          });
-          info.open(map, marker);
-        }
-      });
+      if (!el || !window.kakao?.maps) { setMapFailed(true); return; }
+      try {
+        window.kakao.maps.load(() => {
+          try {
+            const center = new window.kakao.maps.LatLng(lat, lon);
+            const map = new window.kakao.maps.Map(el, { center, level: 4 });
+            const marker = new window.kakao.maps.Marker({ position: center, map });
+            if (name) {
+              const info = new window.kakao.maps.InfoWindow({
+                content: `<div style="padding:5px 10px;font-size:12px;font-weight:bold;white-space:nowrap;">${name}</div>`,
+              });
+              info.open(map, marker);
+            }
+          } catch { setMapFailed(true); }
+        });
+      } catch { setMapFailed(true); }
     }
 
     if (window.kakao?.maps) {
       initMap();
     } else {
-      const existing = document.querySelector("[data-kakao-sdk]");
+      // Check if script tag already exists
+      const existing = document.querySelector<HTMLScriptElement>("[data-kakao-sdk]");
       if (existing) {
-        existing.addEventListener("load", initMap);
-        return () => existing.removeEventListener("load", initMap);
+        // Script might already be loaded (readyState) or still loading
+        if (existing.getAttribute("data-loaded") === "true") {
+          initMap();
+        } else {
+          existing.addEventListener("load", initMap);
+          return () => existing.removeEventListener("load", initMap);
+        }
+      } else {
+        const script = document.createElement("script");
+        script.setAttribute("data-kakao-sdk", "true");
+        script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${appKey}&autoload=false`;
+        script.addEventListener("load", () => { script.setAttribute("data-loaded", "true"); initMap(); });
+        script.addEventListener("error", () => setMapFailed(true));
+        document.head.appendChild(script);
       }
-      const script = document.createElement("script");
-      script.setAttribute("data-kakao-sdk", "true");
-      script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${appKey}&libraries=services&autoload=false`;
-      script.addEventListener("load", initMap);
-      document.head.appendChild(script);
     }
   }, [lat, lon, name]);
+
+  if (mapFailed) {
+    return (
+      <div className="flex w-full items-center justify-center rounded-b-[2rem] bg-slate-100 text-xs text-slate-400" style={{ height }}>
+        <MapPin className="mr-1 h-3 w-3" />
+        {lat.toFixed(5)}, {lon.toFixed(5)}
+        {name && <span className="ml-2 font-bold text-slate-500">{name}</span>}
+      </div>
+    );
+  }
 
   return <div ref={mapRef} className="w-full" style={{ height }} />;
 }
