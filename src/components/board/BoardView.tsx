@@ -75,11 +75,13 @@ export default function BoardView({ teamId, uid, userName }: BoardViewProps) {
     const q = query(
       collection(db, "posts"),
       where("teamId", "==", teamId),
-      where("isPublic", "==", true),
-      orderBy("createdAt", "desc"),
     );
     const unsub = onSnapshot(q, (snap) => {
-      setPosts(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Post)));
+      const list = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() } as Post))
+        .filter((p) => p.isPublic)
+        .sort((a, b) => b.createdAt - a.createdAt);
+      setPosts(list);
     });
     return () => unsub();
   }, [teamId]);

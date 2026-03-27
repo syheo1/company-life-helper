@@ -424,9 +424,12 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
     try {
       const { db } = getFirebaseClient();
       const snap = await getDocs(
-        query(collection(db, "posts"), where("teamId", "==", teamId), orderBy("createdAt", "desc")),
+        query(collection(db, "posts"), where("teamId", "==", teamId)),
       );
-      setAdminPosts(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Post)));
+      const list = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() } as Post))
+        .sort((a, b) => b.createdAt - a.createdAt);
+      setAdminPosts(list);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "게시글을 불러오지 못했습니다.");
     } finally {
