@@ -142,36 +142,35 @@ export default function AdminLoginPage() {
             </div>
 
             <h1 className="mt-12 text-4xl font-black leading-tight lg:text-6xl">
-              통제된 접근을 위한
+              관리자 전용
               <br />
-              어드민 인증 허브
+              어드민 콘솔
             </h1>
             <p className="mt-5 max-w-2xl text-sm leading-7 text-slate-300 lg:text-base">
-              어드민은 영문 ID 기반으로 로그인하며, 관리자 컬렉션과 권한 레벨을 기준으로
-              분리된 인증 흐름을 사용합니다.
+              팀 관리, 공지 등록, 투표 생성 등 다양한 운영 기능을
+              어드민 콘솔에서 한 번에 관리하세요.
             </p>
 
             <div className="mt-10 grid gap-4 sm:grid-cols-2">
               <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-5">
                 <Activity className="h-5 w-5 text-cyan-300" />
-                <p className="mt-3 text-lg font-bold">Admin ID Login</p>
+                <p className="mt-3 text-lg font-bold">어드민 ID 로그인</p>
                 <p className="mt-2 text-sm text-slate-300">
-                  이메일이 아닌 영문 ID 기준 인증
+                  이메일 대신 지정된 어드민 ID로 로그인해요
                 </p>
               </div>
               <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-5">
                 <Shield className="h-5 w-5 text-cyan-300" />
-                <p className="mt-3 text-lg font-bold">Role Controlled</p>
+                <p className="mt-3 text-lg font-bold">역할 기반 권한</p>
                 <p className="mt-2 text-sm text-slate-300">
-                  승인 상태와 관리자 역할 기반 진입 제어
+                  담당 팀과 권한에 맞는 기능만 열려요
                 </p>
               </div>
             </div>
           </div>
 
           <div className="mt-10 rounded-[1.75rem] border border-white/10 bg-black/20 p-5 text-sm text-slate-300">
-            관리자 로그인도 프론트와 동일하게 네비게이션 요소 없이 인증에만 집중하도록
-            구성했습니다.
+            아직 어드민 계정이 없으신가요? 오른쪽 하단에서 바로 가입하고 승인 요청을 보내세요.
           </div>
         </section>
 
@@ -254,7 +253,7 @@ export default function AdminLoginPage() {
                 href="/login"
                 className="block text-center text-sm font-bold text-slate-400 transition hover:text-slate-700"
               >
-                프론트 로그인으로 이동
+                일반 사용자 로그인
               </Link>
             </div>
           </div>

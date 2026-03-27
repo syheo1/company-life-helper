@@ -179,38 +179,38 @@ export default function AdminSignupPage() {
                 <UserCog className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-lg font-black">Admin Membership</p>
+                <p className="text-lg font-black">어드민 가입</p>
                 <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-slate-400">
-                  Controlled Enrollment
+                  Admin Signup
                 </p>
               </div>
             </div>
 
             <h1 className="mt-10 text-4xl font-black leading-tight lg:text-6xl">
-              관리자 전용
+              어드민 계정을
               <br />
-              계정 등록 절차
+              만들어볼게요 🛠️
             </h1>
             <p className="mt-5 max-w-2xl text-sm leading-7 text-slate-300 lg:text-base">
-              어드민은 영문 소문자 ID로 가입하며, 일반 사용자와 별도 테이블 및 별도 인증
-              흐름을 사용합니다.
+              어드민 전용 ID로 가입하고, 승인 후 팀 관리·공지·투표 등
+              모든 운영 권한을 얻을 수 있어요.
             </p>
 
             <div className="mt-10 grid gap-4 sm:grid-cols-3">
               <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-5">
                 <KeyRound className="h-5 w-5 text-cyan-300" />
-                <p className="mt-3 text-sm font-bold">ID Format</p>
-                <p className="mt-2 text-sm text-slate-300">영문 소문자 10자 이내</p>
+                <p className="mt-3 text-sm font-bold">ID 규칙</p>
+                <p className="mt-2 text-sm text-slate-300">영문 소문자만, 최대 10자</p>
               </div>
               <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-5">
                 <ShieldCheck className="h-5 w-5 text-cyan-300" />
-                <p className="mt-3 text-sm font-bold">Separate Table</p>
-                <p className="mt-2 text-sm text-slate-300">adminUsers 컬렉션 분리</p>
+                <p className="mt-3 text-sm font-bold">전용 계정</p>
+                <p className="mt-2 text-sm text-slate-300">일반 사용자와 분리된 어드민 계정</p>
               </div>
               <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-5">
                 <BadgeCheck className="h-5 w-5 text-cyan-300" />
-                <p className="mt-3 text-sm font-bold">Approval First</p>
-                <p className="mt-2 text-sm text-slate-300">승인 후 포털 접근 가능</p>
+                <p className="mt-3 text-sm font-bold">승인 후 활성화</p>
+                <p className="mt-2 text-sm text-slate-300">가입 후 승인 완료 시 바로 시작</p>
               </div>
             </div>
           </div>
@@ -223,7 +223,7 @@ export default function AdminSignupPage() {
             </p>
             <h2 className="mt-3 text-3xl font-black">어드민 회원가입</h2>
             <p className="mt-3 text-sm leading-6 text-slate-500">
-              관리자 계정은 일반 사용자와 다른 팀 선택 기반 승인 절차를 따릅니다.
+              소속 팀을 선택하고 어드민 ID를 등록하세요. 승인 후 운영 기능을 모두 이용할 수 있어요.
             </p>
 
             <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
@@ -277,7 +277,7 @@ export default function AdminSignupPage() {
                   placeholder="webmaster"
                 />
                 <span className="mt-2 block text-xs font-medium text-slate-500">
-                  영문 소문자만 가능하며 10자 이내로 제한됩니다.
+                  영문 소문자만 사용 가능하며 최대 10자까지 입력할 수 있어요.
                 </span>
               </label>
 
@@ -331,7 +331,7 @@ export default function AdminSignupPage() {
                 ) : (
                   <ShieldCheck className="h-4 w-4" />
                 )}
-                {isSubmitting ? "가입 처리 중..." : "어드민 회원가입"}
+                {isSubmitting ? "가입 처리 중..." : "어드민으로 가입하기"}
               </button>
             </form>
 
@@ -340,13 +340,13 @@ export default function AdminSignupPage() {
                 href="/admin/login"
                 className="block rounded-2xl bg-slate-100 px-4 py-3 text-center text-sm font-bold text-slate-700 transition hover:bg-slate-200"
               >
-                어드민 로그인으로 이동
+                이미 계정이 있으신가요? 어드민 로그인
               </Link>
               <Link
                 href="/signup"
                 className="block text-center text-sm font-bold text-slate-400 transition hover:text-slate-700"
               >
-                프론트 회원가입으로 이동
+                일반 사용자로 가입하기
               </Link>
             </div>
           </div>

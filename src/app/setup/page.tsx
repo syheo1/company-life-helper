@@ -145,26 +145,26 @@ export default function SetupPage() {
             <h1 className="mt-12 text-4xl font-black leading-tight lg:text-6xl">
               첫 팀을 만들고
               <br />
-              가입 흐름을 여세요
+              시작해볼까요? 🏢
             </h1>
             <p className="mt-5 max-w-2xl text-sm leading-7 text-emerald-50 lg:text-base">
-              Firestore에 `teams` 컬렉션이 없으면 회원가입 셀렉트가 비어 있습니다. 여기서
-              첫 팀을 만들어두면 프론트/어드민 가입 화면에서 바로 선택할 수 있습니다.
+              팀을 먼저 만들어두면 가입할 때 바로 선택할 수 있어요.
+              팀 이름과 사용할 기능을 설정하고 Life Helper를 시작하세요.
             </p>
 
             <div className="mt-10 grid gap-4 sm:grid-cols-2">
               <div className="rounded-[1.75rem] bg-white/12 p-5 backdrop-blur">
                 <Building2 className="h-5 w-5 text-emerald-100" />
-                <p className="mt-3 text-lg font-bold">Team Bootstrap</p>
+                <p className="mt-3 text-lg font-bold">팀 생성</p>
                 <p className="mt-2 text-sm text-emerald-50">
-                  첫 팀 문서를 Firestore에 생성합니다.
+                  팀 이름을 정하고 첫 팀을 바로 만들어요.
                 </p>
               </div>
               <div className="rounded-[1.75rem] bg-white/12 p-5 backdrop-blur">
                 <ShieldCheck className="h-5 w-5 text-emerald-100" />
-                <p className="mt-3 text-lg font-bold">Feature Preset</p>
+                <p className="mt-3 text-lg font-bold">기능 설정</p>
                 <p className="mt-2 text-sm text-emerald-50">
-                  팀별 활성 기능도 함께 설정합니다.
+                  팀에서 사용할 기능을 골라 활성화하세요.
                 </p>
               </div>
             </div>
@@ -184,7 +184,7 @@ export default function SetupPage() {
             </p>
             <h2 className="mt-3 text-3xl font-black text-slate-900">첫 팀 생성</h2>
             <p className="mt-3 text-sm leading-6 text-slate-500">
-              팀 ID는 셀렉트 박스의 실제 값으로 사용됩니다.
+              팀 ID와 이름을 설정하고 사용할 기능을 선택하세요.
             </p>
 
             <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
@@ -199,7 +199,7 @@ export default function SetupPage() {
                   placeholder="webapp-team"
                 />
                 <span className="mt-2 block text-xs font-medium text-slate-500">
-                  저장될 문서 ID: <span className="font-bold">{normalizedTeamId || "-"}</span>
+                  실제 팀 ID: <span className="font-bold">{normalizedTeamId || "-"}</span>
                 </span>
               </label>
 

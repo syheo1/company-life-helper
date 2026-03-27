@@ -172,7 +172,7 @@ export default function FrontSignupPage() {
             <div>
               <p className="text-lg font-black tracking-tight">Life Helper</p>
               <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
-                Front Membership
+                신규 가입
               </p>
             </div>
           </div>
@@ -190,31 +190,31 @@ export default function FrontSignupPage() {
             <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-blue-600 to-indigo-700 p-8 text-white shadow-2xl shadow-blue-200 lg:p-12">
               <div className="relative z-10">
                 <span className="inline-flex rounded-full bg-white/20 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em]">
-                  Join Front Portal
+                  새 멤버 합류
                 </span>
                 <h1 className="mt-5 text-4xl font-black leading-tight lg:text-6xl">
-                  이메일로 시작하는
+                  팀과 함께
                   <br />
-                  프론트 포털 가입
+                  시작해보세요 🙌
                 </h1>
                 <p className="mt-5 max-w-2xl text-sm leading-7 text-blue-100 lg:text-base">
-                  사용자는 실제 이메일로 가입하고 승인 이후에 팀별 기능이 열리는 라이프
-                  헬퍼 포털에 입장합니다.
+                  이메일로 간편하게 가입하고, 팀 승인 후 점심 추천·팀 일정·공지사항 등
+                  다양한 기능을 바로 이용할 수 있어요.
                 </p>
 
                 <div className="mt-10 grid gap-4 sm:grid-cols-2">
                   <div className="rounded-[1.75rem] bg-white/12 p-5 backdrop-blur">
                     <ShieldCheck className="h-5 w-5 text-cyan-200" />
-                    <p className="mt-3 text-lg font-bold">승인 기반 접근</p>
+                    <p className="mt-3 text-lg font-bold">승인 후 바로 시작</p>
                     <p className="mt-2 text-sm text-blue-100">
-                      가입 후 승인 절차를 거쳐 대시보드가 열립니다.
+                      가입 후 팀장 승인이 완료되면 대시보드가 열려요.
                     </p>
                   </div>
                   <div className="rounded-[1.75rem] bg-white/12 p-5 backdrop-blur">
                     <ArrowRight className="h-5 w-5 text-cyan-200" />
                     <p className="mt-3 text-lg font-bold">팀 선택 가입</p>
                     <p className="mt-2 text-sm text-blue-100">
-                      관리자에게서 생성된 팀 목록 중 하나를 선택합니다.
+                      소속 팀을 선택해서 팀 맞춤 기능을 이용하세요.
                     </p>
                   </div>
                 </div>
@@ -226,11 +226,11 @@ export default function FrontSignupPage() {
 
           <section className="rounded-[2.25rem] border border-white/60 bg-white/85 p-8 shadow-xl shadow-slate-200/70 backdrop-blur lg:p-9">
             <p className="text-sm font-bold uppercase tracking-[0.22em] text-blue-600">
-              Front Signup
+              Life Helper
             </p>
-            <h2 className="mt-3 text-3xl font-black text-slate-900">프론트 회원가입</h2>
+            <h2 className="mt-3 text-3xl font-black text-slate-900">회원가입</h2>
             <p className="mt-3 text-sm leading-6 text-slate-500">
-              일반 사용자는 이메일 계정으로 가입하며 승인 전까지는 대기 상태로 유지됩니다.
+              이메일로 가입하고 팀 승인 후 Life Helper의 모든 기능을 이용하세요.
             </p>
 
             <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
@@ -336,7 +336,7 @@ export default function FrontSignupPage() {
                 ) : (
                   <UserPlus className="h-4 w-4" />
                 )}
-                {isSubmitting ? "가입 처리 중..." : "프론트 회원가입"}
+                {isSubmitting ? "가입 처리 중..." : "가입하기"}
               </button>
             </form>
 
@@ -345,13 +345,13 @@ export default function FrontSignupPage() {
                 href="/login"
                 className="block rounded-2xl bg-slate-50 px-4 py-3 text-center text-sm font-bold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
               >
-                프론트 로그인으로 이동
+                이미 계정이 있으신가요? 로그인
               </Link>
               <Link
                 href="/admin/signup"
                 className="block text-center text-sm font-bold text-slate-400 transition hover:text-slate-700"
               >
-                어드민 계정이신가요?
+                관리자(어드민)로 가입하기
               </Link>
             </div>
           </section>

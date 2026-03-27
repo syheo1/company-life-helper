@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   collection,
   deleteDoc,
@@ -192,8 +193,6 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
   const [isContentLoading, setIsContentLoading] = useState(false);
 
   // Action state
-  const [actionMessage, setActionMessage] = useState("");
-  const [actionError, setActionError] = useState("");
   const [busyKey, setBusyKey] = useState("");
 
   // Notice form
@@ -255,11 +254,10 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
   useEffect(() => {
     async function loadAdminData() {
       setIsLoading(true);
-      setActionError("");
       try {
         await refreshData();
       } catch (error) {
-        setActionError(
+        toast.error(
           error instanceof Error ? error.message : "관리자 데이터를 불러오지 못했습니다.",
         );
       } finally {
@@ -271,17 +269,11 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
 
   // Load content data when page changes
   useEffect(() => {
-    clearMessages();
     if (activePage === "notices") void loadNotices();
     else if (activePage === "restaurants") void loadRestaurants();
     else if (activePage === "polls") void loadPolls();
     else if (activePage === "calendar") void loadCalendarEvents();
   }, [activePage]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function clearMessages() {
-    setActionMessage("");
-    setActionError("");
-  }
 
   // --- Content loaders ---
 
@@ -301,7 +293,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
       });
       setNotices(list);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "공지사항을 불러오지 못했습니다.");
+      toast.error(error instanceof Error ? error.message : "공지사항을 불러오지 못했습니다.");
     } finally {
       setIsContentLoading(false);
     }
@@ -319,7 +311,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
       list.sort((a, b) => b.createdAt - a.createdAt);
       setRestaurants(list);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "맛집 데이터를 불러오지 못했습니다.");
+      toast.error(error instanceof Error ? error.message : "맛집 데이터를 불러오지 못했습니다.");
     } finally {
       setIsContentLoading(false);
     }
@@ -337,7 +329,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
       list.sort((a, b) => b.createdAt - a.createdAt);
       setPolls(list);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "투표를 불러오지 못했습니다.");
+      toast.error(error instanceof Error ? error.message : "투표를 불러오지 못했습니다.");
     } finally {
       setIsContentLoading(false);
     }
@@ -355,7 +347,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
       list.sort((a, b) => a.date - b.date);
       setCalendarEvents(list);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "일정을 불러오지 못했습니다.");
+      toast.error(error instanceof Error ? error.message : "일정을 불러오지 못했습니다.");
     } finally {
       setIsContentLoading(false);
     }
@@ -394,17 +386,15 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
     const messagePrefix = accountType === "admin" ? "어드민 계정" : "프론트 계정";
     const taskKey = `${accountType}:${uid}:${status}`;
     setBusyKey(taskKey);
-    setActionError("");
-    setActionMessage("");
     try {
       const { db } = getFirebaseClient();
       await updateDoc(doc(db, collectionName, uid), { status });
       await refreshData();
-      setActionMessage(
+      toast.success(
         `${messagePrefix} 상태를 ${status === "approved" ? "승인" : "반려"}으로 변경했습니다.`,
       );
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "상태 변경에 실패했습니다.");
+      toast.error(error instanceof Error ? error.message : "상태 변경에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -432,11 +422,11 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
 
   async function addWorkLocation(lat: number, lon: number) {
     if (!workLocationForm.name.trim() || !workLocationForm.address.trim()) {
-      setActionError("근무지 이름과 주소를 입력해주세요.");
+      toast.error("근무지 이름과 주소를 입력해주세요.");
       return;
     }
     setBusyKey("wl-add");
-    clearMessages();
+
     try {
       const { db } = getFirebaseClient();
       const docRef = doc(collection(db, "workLocations"));
@@ -453,9 +443,9 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
       setPreviewCoords(null);
       setShowWorkLocationForm(false);
       await refreshData();
-      setActionMessage("근무지가 등록되었습니다.");
+      toast.success("근무지가 등록되었습니다.");
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "근무지 등록에 실패했습니다.");
+      toast.error(error instanceof Error ? error.message : "근무지 등록에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -463,14 +453,14 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
 
   async function deleteWorkLocation(id: string) {
     setBusyKey(`wl-del:${id}`);
-    clearMessages();
+
     try {
       const { db } = getFirebaseClient();
       await deleteDoc(doc(db, "workLocations", id));
       await refreshData();
-      setActionMessage("근무지가 삭제되었습니다.");
+      toast.success("근무지가 삭제되었습니다.");
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "삭제에 실패했습니다.");
+      toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -480,14 +470,14 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
     const collectionName = accountType === "admin" ? "adminUsers" : "frontUsers";
     const taskKey = `del:${accountType}:${uid}`;
     setBusyKey(taskKey);
-    clearMessages();
+
     try {
       const { db } = getFirebaseClient();
       await deleteDoc(doc(db, collectionName, uid));
       await refreshData();
-      setActionMessage("계정이 삭제되었습니다.");
+      toast.success("계정이 삭제되었습니다.");
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "삭제에 실패했습니다.");
+      toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -496,15 +486,15 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
   async function changeUserTeam(uid: string, newTeamId: string) {
     const taskKey = `team-change:${uid}`;
     setBusyKey(taskKey);
-    clearMessages();
+
     try {
       const { db } = getFirebaseClient();
       await updateDoc(doc(db, "frontUsers", uid), { teamId: newTeamId });
       await refreshData();
       setEditingTeamUid("");
-      setActionMessage("소속 팀이 변경되었습니다.");
+      toast.success("소속 팀이 변경되었습니다.");
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "팀 변경에 실패했습니다.");
+      toast.error(error instanceof Error ? error.message : "팀 변경에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -513,15 +503,15 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
   async function saveAdminPermissions(uid: string, permissions: string[]) {
     const taskKey = `permissions:${uid}`;
     setBusyKey(taskKey);
-    clearMessages();
+
     try {
       const { db } = getFirebaseClient();
       await updateDoc(doc(db, "adminUsers", uid), { permissions });
       await refreshData();
       setEditingPermissionsUid("");
-      setActionMessage("권한이 업데이트되었습니다.");
+      toast.success("권한이 업데이트되었습니다.");
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "권한 변경에 실패했습니다.");
+      toast.error(error instanceof Error ? error.message : "권한 변경에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -530,8 +520,6 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
   async function approveAllPending() {
     if (pendingUsers.length === 0) return;
     setBusyKey("bulk-approve");
-    setActionError("");
-    setActionMessage("");
     try {
       const { db } = getFirebaseClient();
       await Promise.all(
@@ -543,9 +531,9 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
         ),
       );
       await refreshData();
-      setActionMessage("대기 중인 계정을 모두 승인했습니다.");
+      toast.success("대기 중인 계정을 모두 승인했습니다.");
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "전체 승인에 실패했습니다.");
+      toast.error(error instanceof Error ? error.message : "전체 승인에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -554,8 +542,6 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
   async function toggleTeamFeature(teamIdValue: string, feature: Feature, enabled: boolean) {
     const taskKey = `team:${teamIdValue}:${feature}`;
     setBusyKey(taskKey);
-    setActionError("");
-    setActionMessage("");
     try {
       const { db } = getFirebaseClient();
       const targetTeam = teams.find((t) => t.id === teamIdValue);
@@ -565,9 +551,9 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
         : [...targetTeam.features, feature];
       await updateDoc(doc(db, "teams", teamIdValue), { features: nextFeatures });
       await refreshData();
-      setActionMessage("팀 기능 설정을 업데이트했습니다.");
+      toast.success("팀 기능 설정을 업데이트했습니다.");
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "팀 기능 변경에 실패했습니다.");
+      toast.error(error instanceof Error ? error.message : "팀 기능 변경에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -577,11 +563,11 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
 
   async function addNotice() {
     if (!noticeForm.title.trim() || !noticeForm.content.trim()) {
-      setActionError("제목과 내용을 모두 입력해주세요.");
+      toast.error("제목과 내용을 모두 입력해주세요.");
       return;
     }
     setBusyKey("notice-add");
-    clearMessages();
+
     try {
       const { db } = getFirebaseClient();
       const docRef = doc(collection(db, "notices"));
@@ -606,9 +592,9 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
       setNoticeImagePreview("");
       setShowNoticeForm(false);
       await loadNotices();
-      setActionMessage("공지사항이 등록되었습니다.");
+      toast.success("공지사항이 등록되었습니다.");
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "공지사항 등록에 실패했습니다.");
+      toast.error(error instanceof Error ? error.message : "공지사항 등록에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -616,14 +602,14 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
 
   async function deleteNotice(id: string) {
     setBusyKey(`notice-del:${id}`);
-    clearMessages();
+
     try {
       const { db } = getFirebaseClient();
       await deleteDoc(doc(db, "notices", id));
       await loadNotices();
-      setActionMessage("공지사항이 삭제되었습니다.");
+      toast.success("공지사항이 삭제되었습니다.");
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "삭제에 실패했습니다.");
+      toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -631,14 +617,14 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
 
   async function toggleNoticePin(id: string, isPinned: boolean) {
     setBusyKey(`notice-pin:${id}`);
-    clearMessages();
+
     try {
       const { db } = getFirebaseClient();
       await updateDoc(doc(db, "notices", id), { isPinned: !isPinned, updatedAt: Date.now() });
       await loadNotices();
-      setActionMessage(isPinned ? "고정이 해제되었습니다." : "공지사항이 고정되었습니다.");
+      toast.success(isPinned ? "고정이 해제되었습니다." : "공지사항이 고정되었습니다.");
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "고정 변경에 실패했습니다.");
+      toast.error(error instanceof Error ? error.message : "고정 변경에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -648,21 +634,21 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
 
   async function addRestaurant() {
     if (!restaurantForm.name.trim()) {
-      setActionError("식당 이름을 입력해주세요.");
+      toast.error("식당 이름을 입력해주세요.");
       return;
     }
     const rating = parseFloat(restaurantForm.rating);
     const walkMinutes = parseInt(restaurantForm.walkMinutes, 10);
     if (isNaN(rating) || rating < 0 || rating > 5) {
-      setActionError("평점은 0~5 사이로 입력해주세요.");
+      toast.error("평점은 0~5 사이로 입력해주세요.");
       return;
     }
     if (isNaN(walkMinutes) || walkMinutes < 1) {
-      setActionError("도보 시간을 1분 이상으로 입력해주세요.");
+      toast.error("도보 시간을 1분 이상으로 입력해주세요.");
       return;
     }
     setBusyKey("restaurant-add");
-    clearMessages();
+
     try {
       const { db } = getFirebaseClient();
       const docRef = doc(collection(db, "restaurants"));
@@ -682,9 +668,9 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
       setRestaurantPreviewCoords(null);
       setShowRestaurantForm(false);
       await loadRestaurants();
-      setActionMessage("맛집이 등록되었습니다.");
+      toast.success("맛집이 등록되었습니다.");
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "맛집 등록에 실패했습니다.");
+      toast.error(error instanceof Error ? error.message : "맛집 등록에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -692,14 +678,14 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
 
   async function deleteRestaurant(id: string) {
     setBusyKey(`restaurant-del:${id}`);
-    clearMessages();
+
     try {
       const { db } = getFirebaseClient();
       await deleteDoc(doc(db, "restaurants", id));
       await loadRestaurants();
-      setActionMessage("맛집이 삭제되었습니다.");
+      toast.success("맛집이 삭제되었습니다.");
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "삭제에 실패했습니다.");
+      toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -710,19 +696,19 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
   async function addPoll() {
     const validOptions = pollForm.options.filter((o) => o.trim() !== "");
     if (!pollForm.title.trim()) {
-      setActionError("투표 제목을 입력해주세요.");
+      toast.error("투표 제목을 입력해주세요.");
       return;
     }
     if (validOptions.length < 2) {
-      setActionError("선택지는 최소 2개 이상 입력해주세요.");
+      toast.error("선택지는 최소 2개 이상 입력해주세요.");
       return;
     }
     if (!pollForm.endsAt) {
-      setActionError("마감일을 설정해주세요.");
+      toast.error("마감일을 설정해주세요.");
       return;
     }
     setBusyKey("poll-add");
-    clearMessages();
+
     try {
       const { db } = getFirebaseClient();
       const docRef = doc(collection(db, "polls"));
@@ -744,9 +730,9 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
       setPollForm({ title: "", options: ["", ""], endsAt: "" });
       setShowPollForm(false);
       await loadPolls();
-      setActionMessage("투표가 생성되었습니다.");
+      toast.success("투표가 생성되었습니다.");
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "투표 생성에 실패했습니다.");
+      toast.error(error instanceof Error ? error.message : "투표 생성에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -754,14 +740,14 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
 
   async function endPoll(id: string) {
     setBusyKey(`poll-end:${id}`);
-    clearMessages();
+
     try {
       const { db } = getFirebaseClient();
       await updateDoc(doc(db, "polls", id), { status: "ended" });
       await loadPolls();
-      setActionMessage("투표가 종료되었습니다.");
+      toast.success("투표가 종료되었습니다.");
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "투표 종료에 실패했습니다.");
+      toast.error(error instanceof Error ? error.message : "투표 종료에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -769,14 +755,14 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
 
   async function deletePoll(id: string) {
     setBusyKey(`poll-del:${id}`);
-    clearMessages();
+
     try {
       const { db } = getFirebaseClient();
       await deleteDoc(doc(db, "polls", id));
       await loadPolls();
-      setActionMessage("투표가 삭제되었습니다.");
+      toast.success("투표가 삭제되었습니다.");
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "삭제에 실패했습니다.");
+      toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -786,15 +772,15 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
 
   async function addCalendarEvent() {
     if (!eventForm.title.trim()) {
-      setActionError("일정 제목을 입력해주세요.");
+      toast.error("일정 제목을 입력해주세요.");
       return;
     }
     if (!eventForm.date) {
-      setActionError("날짜를 선택해주세요.");
+      toast.error("날짜를 선택해주세요.");
       return;
     }
     setBusyKey("event-add");
-    clearMessages();
+
     try {
       const { db } = getFirebaseClient();
       const docRef = doc(collection(db, "calendarEvents"));
@@ -809,9 +795,9 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
       setEventForm({ title: "", emoji: "📅", date: "" });
       setShowEventForm(false);
       await loadCalendarEvents();
-      setActionMessage("일정이 등록되었습니다.");
+      toast.success("일정이 등록되었습니다.");
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "일정 등록에 실패했습니다.");
+      toast.error(error instanceof Error ? error.message : "일정 등록에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -819,14 +805,14 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
 
   async function deleteCalendarEvent(id: string) {
     setBusyKey(`event-del:${id}`);
-    clearMessages();
+
     try {
       const { db } = getFirebaseClient();
       await deleteDoc(doc(db, "calendarEvents", id));
       await loadCalendarEvents();
-      setActionMessage("일정이 삭제되었습니다.");
+      toast.success("일정이 삭제되었습니다.");
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "삭제에 실패했습니다.");
+      toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -838,11 +824,11 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
     return (
       <div className="max-w-6xl space-y-8">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
-          <MetricCard label="Total Users" value={`${totalUsers}명`} accent="text-slate-900" />
-          <MetricCard label="Pending" value={`${pendingUsers.length}명`} accent="text-orange-500" />
-          <MetricCard label="Total Teams" value={`${teams.length}개`} accent="text-blue-500" />
+          <MetricCard label="전체 사용자" value={`${totalUsers}명`} accent="text-slate-900" />
+          <MetricCard label="승인 대기" value={`${pendingUsers.length}명`} accent="text-orange-500" />
+          <MetricCard label="운영 팀 수" value={`${teams.length}개`} accent="text-blue-500" />
           <MetricCard
-            label="Admin Accounts"
+            label="관리자 계정"
             value={`${adminUsers.length}명`}
             accent="text-green-500"
           />
@@ -888,20 +874,20 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
           </div>
 
           <div className="rounded-[2.5rem] border border-gray-100 bg-white p-8 shadow-sm">
-            <h4 className="mb-6 text-lg font-bold">시스템 요약</h4>
+            <h4 className="mb-6 text-lg font-bold">현황 요약</h4>
             <div className="space-y-4">
               <div className="h-2 overflow-hidden rounded-full bg-slate-100">
                 <div className="h-full w-2/3 bg-indigo-500" />
               </div>
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                Team Activation Readiness: {teams.length > 0 ? "67%" : "0%"}
+                팀 운영 준비 현황: {teams.length > 0 ? "67%" : "0%"}
               </p>
               <div className="grid gap-3 rounded-3xl bg-slate-50 p-5 text-sm text-slate-600">
                 <p>
-                  현재 세션 역할: <span className="font-bold text-slate-900">{role}</span>
+                  내 역할: <span className="font-bold text-slate-900">{role}</span>
                 </p>
                 <p>
-                  현재 세션 팀 ID:{" "}
+                  담당 팀 ID:{" "}
                   <span className="font-bold text-slate-900">{teamId || "-"}</span>
                 </p>
               </div>
@@ -1229,7 +1215,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
         <div className="flex items-center justify-between">
           <h3 className="text-2xl font-black">근무지 관리</h3>
           <button
-            onClick={() => { setShowWorkLocationForm((v) => !v); setPreviewCoords(null); clearMessages(); }}
+            onClick={() => { setShowWorkLocationForm((v) => !v); setPreviewCoords(null); }}
             className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm"
           >
             {showWorkLocationForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
@@ -1257,11 +1243,11 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
               />
               <button
                 onClick={() => {
-                  if (!workLocationForm.address.trim()) { setActionError("주소를 입력해주세요."); return; }
+                  if (!workLocationForm.address.trim()) { toast.error("주소를 입력해주세요."); return; }
                   void geocodeAddress(
                     workLocationForm.address,
                     (lat, lon) => setPreviewCoords({ lat, lon }),
-                    () => setActionError("주소를 찾을 수 없습니다. 더 구체적으로 입력해주세요."),
+                    () => toast.error("주소를 찾을 수 없습니다. 더 구체적으로 입력해주세요."),
                   );
                 }}
                 disabled={geoSearching}
@@ -1339,7 +1325,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
                 </div>
               </div>
               <p className="mb-6 text-[10px] font-black uppercase tracking-widest text-slate-300">
-                Feature Access Control
+                팀 기능 활성화 설정
               </p>
               <div className="flex flex-wrap gap-3">
                 {(Object.keys(FEATURE_LABELS) as Feature[]).map((feature) => {
@@ -1387,7 +1373,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
           <button
             onClick={() => {
               setShowNoticeForm((v) => !v);
-              clearMessages();
+          
             }}
             className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm"
           >
@@ -1553,7 +1539,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
           <button
             onClick={() => {
               setShowRestaurantForm((v) => !v);
-              clearMessages();
+          
             }}
             className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm"
           >
@@ -1650,7 +1636,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
                 />
                 <button
                   onClick={() => {
-                    if (!restaurantForm.address.trim()) { setActionError("주소를 입력해주세요."); return; }
+                    if (!restaurantForm.address.trim()) { toast.error("주소를 입력해주세요."); return; }
                     void (async () => {
                       setRestaurantGeoSearching(true);
                       try {
@@ -1662,10 +1648,10 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
                         if (data.length > 0) {
                           setRestaurantPreviewCoords({ lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) });
                         } else {
-                          setActionError("주소를 찾을 수 없습니다. 더 구체적으로 입력해주세요.");
+                          toast.error("주소를 찾을 수 없습니다. 더 구체적으로 입력해주세요.");
                         }
                       } catch {
-                        setActionError("주소 검색에 실패했습니다.");
+                        toast.error("주소 검색에 실패했습니다.");
                       } finally {
                         setRestaurantGeoSearching(false);
                       }
@@ -1754,7 +1740,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
           <button
             onClick={() => {
               setShowPollForm((v) => !v);
-              clearMessages();
+          
             }}
             className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm"
           >
@@ -1932,7 +1918,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
           <button
             onClick={() => {
               setShowEventForm((v) => !v);
-              clearMessages();
+          
             }}
             className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm"
           >
@@ -2048,7 +2034,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
 
         <nav className="flex-1 space-y-1 overflow-y-auto">
           <p className="mb-4 px-4 text-[10px] font-bold uppercase tracking-widest text-indigo-400">
-            Management
+            운영 관리
           </p>
           {NAV_ITEMS.filter((item) => item.group === "management").map((item) => (
             <SidebarButton
@@ -2060,7 +2046,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
           ))}
 
           <p className="mb-4 mt-8 px-4 text-[10px] font-bold uppercase tracking-widest text-indigo-400">
-            Content
+            콘텐츠 관리
           </p>
           {NAV_ITEMS.filter((item) => item.group === "content").map((item) => (
             <SidebarButton
@@ -2074,7 +2060,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
 
         <div className="mt-auto border-t border-white/10 pt-6">
           <div className="rounded-2xl bg-white/5 p-4 text-sm text-indigo-100">
-            현재 세션 역할: <span className="font-bold text-white">{role}</span>
+            내 역할: <span className="font-bold text-white">{role}</span>
           </div>
         </div>
       </aside>
@@ -2102,17 +2088,6 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
 
         <div className="flex-1 overflow-y-auto p-6 lg:p-10">
           <div className="mx-auto space-y-6">
-            {actionMessage && (
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
-                {actionMessage}
-              </div>
-            )}
-            {actionError && (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-                {actionError}
-              </div>
-            )}
-
             {isLoading ? (
               <div className="flex min-h-[320px] items-center justify-center rounded-[2.5rem] border border-gray-100 bg-white shadow-sm">
                 <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />

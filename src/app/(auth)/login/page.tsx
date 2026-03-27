@@ -111,62 +111,61 @@ export default function FrontLoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="mx-auto grid min-h-screen w-full max-w-7xl gap-8 px-6 py-8 lg:grid-cols-[1.05fr_0.95fr] lg:px-10">
-        <section className="flex flex-col justify-between rounded-[2.5rem] bg-gradient-to-br from-blue-600 to-indigo-700 p-8 text-white shadow-2xl shadow-blue-200 lg:p-10">
+    <main className="min-h-screen bg-slate-50 text-slate-900 flex items-center">
+      <div className="mx-auto grid w-full max-w-7xl gap-8 px-6 py-8 lg:grid-cols-2 lg:px-10">
+        <section className="flex flex-col rounded-[2.5rem] bg-gradient-to-br from-blue-600 to-indigo-700 p-8 text-white shadow-2xl shadow-blue-200 lg:p-10">
           <div>
             <div className="flex items-center gap-4">
-              <div className="rounded-3xl bg-white/14 p-3 backdrop-blur">
+              <div className="rounded-2xl bg-white/14 p-2.5 backdrop-blur">
                 <Image
                   src="/image/CLH_logo.png"
                   alt="웹앱팀 라이프 헬퍼 로고"
-                  width={64}
-                  height={64}
-                  className="h-14 w-14 object-contain"
+                  width={48}
+                  height={48}
+                  className="h-10 w-10 object-contain"
                   priority
                 />
               </div>
               <div>
-                <p className="text-lg font-black tracking-tight">웹앱팀 라이프 헬퍼</p>
-                <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-blue-100/80">
+                <p className="text-base font-black tracking-tight">웹앱팀 라이프 헬퍼</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-blue-100/80">
                   Front Portal
                 </p>
               </div>
             </div>
 
-            <h1 className="mt-12 text-4xl font-black leading-tight lg:text-6xl">
-              프론트 사용자를 위한
+            <h1 className="mt-10 text-3xl font-black leading-tight lg:text-4xl">
+              오늘도 반갑습니다,
               <br />
-              빠르고 가벼운 로그인
+              Life Helper예요 👋
             </h1>
-            <p className="mt-5 max-w-2xl text-sm leading-7 text-blue-100 lg:text-base">
-              이메일 기반 로그인으로 포털에 접속하고, 승인 상태에 따라 개인화된 대시보드로
-              바로 이동합니다.
+            <p className="mt-4 max-w-2xl text-xs leading-6 text-blue-100 lg:text-sm">
+              팀원들과 함께하는 스마트한 사내 생활, 지금 바로 시작하세요.
+              점심 추천부터 팀 일정, 공지사항까지 한곳에서 확인할 수 있어요.
             </p>
 
-            <div className="mt-10 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-[1.75rem] bg-white/12 p-5 backdrop-blur">
-                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-100">
-                  Feature
+            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-[1.5rem] bg-white/12 p-4 backdrop-blur">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-100">
+                  간편 로그인
                 </p>
-                <p className="mt-2 text-xl font-bold">이메일 회원 체계</p>
-                <p className="mt-2 text-sm text-blue-100">일반 사용자 전용 인증 흐름</p>
+                <p className="mt-1.5 text-base font-bold">이메일로 시작</p>
+                <p className="mt-1 text-xs text-blue-100">회사 이메일 하나로 바로 접속해요</p>
               </div>
-              <div className="rounded-[1.75rem] bg-white/12 p-5 backdrop-blur">
-                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-100">
-                  Flow
+              <div className="rounded-[1.5rem] bg-white/12 p-4 backdrop-blur">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-100">
+                  팀 전용 기능
                 </p>
-                <p className="mt-2 text-xl font-bold">승인 상태 연동</p>
-                <p className="mt-2 text-sm text-blue-100">
-                  pending, approved, rejected 분기
+                <p className="mt-1.5 text-base font-bold">팀 맞춤 서비스</p>
+                <p className="mt-1 text-xs text-blue-100">
+                  승인 후 팀에 맞는 기능이 열려요
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="mt-10 rounded-[1.75rem] border border-white/15 bg-white/10 p-5 text-sm text-blue-100">
-            로그인 화면에서는 상단 메뉴와 좌측 네비게이션을 숨기고 인증에만 집중하도록
-            구성했습니다.
+          <div className="mt-8 rounded-[1.25rem] border border-white/15 bg-white/10 p-4 text-xs text-blue-100">
+            아직 계정이 없으신가요? 오른쪽 하단 회원가입 버튼을 눌러 지금 바로 합류하세요.
           </div>
         </section>
 
@@ -182,14 +181,14 @@ export default function FrontLoginPage() {
               />
               <div>
                 <p className="text-sm font-bold uppercase tracking-[0.22em] text-blue-600">
-                  Front Login
+                  Life Helper
                 </p>
-                <h2 className="mt-1 text-3xl font-black">프론트 로그인</h2>
+                <h2 className="mt-1 text-3xl font-black">로그인</h2>
               </div>
             </div>
 
             <p className="text-sm leading-6 text-slate-500">
-              회사 이메일로 로그인하고 프론트 사용자 전용 포털을 이용하세요.
+              회사 이메일로 로그인하고 Life Helper 포털을 이용하세요.
             </p>
 
             <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
@@ -235,7 +234,7 @@ export default function FrontLoginPage() {
                 ) : (
                   <LogIn className="h-4 w-4" />
                 )}
-                {isSubmitting ? "로그인 중..." : "프론트 로그인"}
+                {isSubmitting ? "로그인 중..." : "로그인"}
               </button>
             </form>
 
@@ -244,13 +243,13 @@ export default function FrontLoginPage() {
                 href="/signup"
                 className="block rounded-2xl bg-slate-50 px-4 py-3 text-center text-sm font-bold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
               >
-                프론트 회원가입
+                아직 계정이 없으신가요? 회원가입
               </Link>
               <Link
                 href="/admin/login"
                 className="block text-center text-sm font-bold text-slate-400 transition hover:text-slate-700"
               >
-                어드민 계정이신가요?
+                관리자(어드민)이신가요?
               </Link>
             </div>
           </div>

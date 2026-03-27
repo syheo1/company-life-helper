@@ -48,10 +48,10 @@ type WeatherData = {
 };
 
 const TAB_TITLES: Record<TabId, string> = {
-  home: "Dashboard",
-  calendar: "Team Calendar",
-  lunch: "Lunch Recommendation",
-  vote: "Polls & Surveys",
+  home: "홈",
+  calendar: "팀 일정",
+  lunch: "점심 추천",
+  vote: "투표",
 };
 
 const WEATHER_CODES: Record<number, string> = {
@@ -479,9 +479,9 @@ export default function DashboardPage() {
     return (
       <main className="flex h-screen items-center justify-center bg-slate-50 p-8">
         <div className="max-w-md rounded-3xl border border-red-200 bg-red-50 p-8 text-center">
-          <p className="mb-2 text-lg font-bold text-red-600">데이터 로드 실패</p>
+          <p className="mb-2 text-lg font-bold text-red-600">데이터를 불러오지 못했어요</p>
           <p className="text-sm text-red-500">{loadError}</p>
-          <p className="mt-4 text-xs text-slate-400">브라우저 콘솔(F12)에서 자세한 에러를 확인해주세요.</p>
+          <p className="mt-4 text-xs text-slate-400">잠시 후 다시 시도하거나 관리자에게 문의해주세요.</p>
           <button
             onClick={() => void loadStaticData()}
             className="mt-6 rounded-xl bg-red-500 px-6 py-2.5 text-sm font-bold text-white"
