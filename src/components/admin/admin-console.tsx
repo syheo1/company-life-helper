@@ -1,9 +1,5 @@
 "use client";
 
-declare global {
-  interface Window { kakao: any; }
-}
-
 import {
   CalendarDays,
   Check,
@@ -2158,48 +2154,16 @@ function EmptyState({ text }: { text: string }) {
   );
 }
 
-function KakaoMapView({ lat, lon, name, height = "180px" }: { lat: number; lon: number; name?: string; height?: string }) {
-  const mapRef = useRef<HTMLDivElement>(null);
+function KakaoMapView({ lat, lon, height = "180px" }: { lat: number; lon: number; name?: string; height?: string }) {
+  const delta = 0.008;
+  const src = `https://www.openstreetmap.org/export/embed.html?bbox=${lon - delta},${lat - delta},${lon + delta},${lat + delta}&layer=mapnik&marker=${lat},${lon}`;
 
-  useEffect(() => {
-    const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY;
-    if (!appKey || !mapRef.current) return;
-    const el = mapRef.current;
-
-    function initMap() {
-      window.kakao.maps.load(() => {
-        const center = new window.kakao.maps.LatLng(lat, lon);
-        const map = new window.kakao.maps.Map(el, { center, level: 4 });
-        const marker = new window.kakao.maps.Marker({ position: center, map });
-        if (name) {
-          const info = new window.kakao.maps.InfoWindow({
-            content: `<div style="padding:5px 10px;font-size:12px;font-weight:bold;white-space:nowrap;">${name}</div>`,
-          });
-          info.open(map, marker);
-        }
-      });
-    }
-
-    if (window.kakao?.maps) {
-      initMap();
-    } else {
-      const existing = document.querySelector<HTMLScriptElement>("[data-kakao-sdk]");
-      if (existing) {
-        if (existing.dataset.loaded === "true") {
-          initMap();
-        } else {
-          existing.addEventListener("load", initMap);
-          return () => existing.removeEventListener("load", initMap);
-        }
-      } else {
-        const script = document.createElement("script");
-        script.setAttribute("data-kakao-sdk", "true");
-        script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${appKey}&autoload=false`;
-        script.addEventListener("load", () => { script.dataset.loaded = "true"; initMap(); });
-        document.head.appendChild(script);
-      }
-    }
-  }, [lat, lon, name]);
-
-  return <div ref={mapRef} className="w-full rounded-b-[2rem] overflow-hidden" style={{ height }} />;
+  return (
+    <iframe
+      src={src}
+      className="w-full rounded-b-[2rem]"
+      style={{ height, border: "none" }}
+      loading="lazy"
+    />
+  );
 }
