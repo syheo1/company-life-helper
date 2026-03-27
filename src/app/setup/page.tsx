@@ -126,7 +126,7 @@ export default function SetupPage() {
             <div className="flex items-center gap-4">
               <div className="rounded-3xl bg-white/14 p-3 backdrop-blur">
                 <Image
-                  src="/image/CLH_logo.png"
+                  src="/image/logo.png"
                   alt="웹앱팀 라이프 헬퍼 로고"
                   width={64}
                   height={64}

@@ -500,7 +500,7 @@ export default function DashboardPage() {
         <div className="mb-12 flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 p-2 text-white shadow-lg shadow-blue-200">
             <Image
-              src="/image/CLH_logo.png"
+              src="/image/logo.png"
               alt="Company Life Helper"
               width={32}
               height={32}
@@ -563,7 +563,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-3 lg:hidden">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 p-1.5 text-white">
               <Image
-                src="/image/CLH_logo.png"
+                src="/image/logo.png"
                 alt="Company Life Helper"
                 width={24}
                 height={24}

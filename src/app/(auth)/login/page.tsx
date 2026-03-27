@@ -118,7 +118,7 @@ export default function FrontLoginPage() {
             <div className="flex items-center gap-4">
               <div className="rounded-2xl bg-white/14 p-2.5 backdrop-blur">
                 <Image
-                  src="/image/CLH_logo.png"
+                  src="/image/logo.png"
                   alt="웹앱팀 라이프 헬퍼 로고"
                   width={48}
                   height={48}
@@ -173,7 +173,7 @@ export default function FrontLoginPage() {
           <div className="w-full max-w-md rounded-[2.25rem] border border-white/60 bg-white/90 p-8 text-slate-900 shadow-2xl shadow-slate-200/70 backdrop-blur lg:p-9">
             <div className="mb-6 flex items-center gap-3">
               <Image
-                src="/image/CLH_logo.png"
+                src="/image/logo.png"
                 alt="웹앱팀 라이프 헬퍼"
                 width={48}
                 height={48}

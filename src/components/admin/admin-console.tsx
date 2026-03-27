@@ -2022,7 +2022,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
         <div className="mb-12 flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-500 p-2">
             <Image
-              src="/image/CLH_logo.png"
+              src="/image/logo.png"
               alt="Admin Console"
               width={40}
               height={40}
