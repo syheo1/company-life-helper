@@ -119,7 +119,7 @@ export default function FrontLoginPage() {
               <div className="rounded-2xl bg-white/14 p-2.5 backdrop-blur">
                 <Image
                   src="/image/logo.png"
-                  alt="웹앱팀 라이프 헬퍼 로고"
+                  alt="디아이웨어 라이프 헬퍼 로고"
                   width={48}
                   height={48}
                   className="h-10 w-10 object-contain"
@@ -127,9 +127,9 @@ export default function FrontLoginPage() {
                 />
               </div>
               <div>
-                <p className="text-base font-black tracking-tight">웹앱팀 라이프 헬퍼</p>
+                <p className="text-base font-black tracking-tight">디아이웨어 라이프 헬퍼</p>
                 <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-blue-100/80">
-                  Front Portal
+                  Diware
                 </p>
               </div>
             </div>
@@ -174,7 +174,7 @@ export default function FrontLoginPage() {
             <div className="mb-6 flex items-center gap-3">
               <Image
                 src="/image/logo.png"
-                alt="웹앱팀 라이프 헬퍼"
+                alt="디아이웨어 라이프 헬퍼"
                 width={48}
                 height={48}
                 className="h-12 w-12 object-contain"

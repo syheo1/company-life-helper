@@ -17,7 +17,7 @@ type SetupFormState = {
 
 const INITIAL_FORM: SetupFormState = {
   teamId: "webapp-team",
-  name: "웹앱팀",
+  name: "디아이웨어",
 };
 
 const FEATURE_OPTIONS: { id: Feature; label: string }[] = [
@@ -127,7 +127,7 @@ export default function SetupPage() {
               <div className="rounded-3xl bg-white/14 p-3 backdrop-blur">
                 <Image
                   src="/image/logo.png"
-                  alt="웹앱팀 라이프 헬퍼 로고"
+                  alt="디아이웨어 라이프 헬퍼 로고"
                   width={64}
                   height={64}
                   className="h-14 w-14 object-contain"
@@ -211,7 +211,7 @@ export default function SetupPage() {
                   onChange={(event) =>
                     setForm((current) => ({ ...current, name: event.target.value }))
                   }
-                  placeholder="웹앱팀"
+                  placeholder="디아이웨어"
                 />
               </label>
 

@@ -126,7 +126,7 @@ export default function AdminLoginPage() {
               <div className="rounded-3xl bg-white/10 p-3 backdrop-blur">
                 <Image
                   src="/image/logo.png"
-                  alt="웹앱팀 라이프 헬퍼 관리자 로고"
+                  alt="디아이웨어 라이프 헬퍼 관리자 로고"
                   width={64}
                   height={64}
                   className="h-14 w-14 object-contain"
