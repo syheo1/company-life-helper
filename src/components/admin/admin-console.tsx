@@ -204,7 +204,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
     category: "한식",
     rating: "4.5",
     walkMinutes: "5",
-    workLocationId: "",
+    workLocationIds: [] as string[],
     address: "",
   });
   const [restaurantGeoSearching, setRestaurantGeoSearching] = useState(false);
@@ -655,12 +655,12 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
         rating,
         walkMinutes,
         teamId,
-        workLocationId: restaurantForm.workLocationId || "",
+        workLocationIds: restaurantForm.workLocationIds,
         address: restaurantForm.address.trim() || "",
         ...(restaurantPreviewCoords ? { lat: restaurantPreviewCoords.lat, lon: restaurantPreviewCoords.lon } : {}),
         createdAt: Date.now(),
       });
-      setRestaurantForm({ name: "", category: "한식", rating: "4.5", walkMinutes: "5", workLocationId: "", address: "" });
+      setRestaurantForm({ name: "", category: "한식", rating: "4.5", walkMinutes: "5", workLocationIds: [], address: "" });
       setRestaurantPreviewCoords(null);
       setShowRestaurantForm(false);
       await loadRestaurants();
@@ -1604,19 +1604,45 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
               </div>
             </div>
 
-            {/* 근무지 */}
+            {/* 근무지 (다중 선택) */}
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-500">근무지</label>
-              <select
-                value={restaurantForm.workLocationId}
-                onChange={(e) => setRestaurantForm((f) => ({ ...f, workLocationId: e.target.value }))}
-                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400"
-              >
-                <option value="">전체 공통 (근무지 무관)</option>
-                {workLocations.map((wl) => (
-                  <option key={wl.id} value={wl.id}>{wl.name}</option>
-                ))}
-              </select>
+              <p className="text-xs font-bold text-slate-500">근무지 <span className="font-normal text-slate-400">(여러 개 선택 가능)</span></p>
+              {workLocations.length === 0 ? (
+                <p className="text-xs text-slate-400">등록된 근무지가 없습니다.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {workLocations.map((wl) => {
+                    const checked = restaurantForm.workLocationIds.includes(wl.id);
+                    return (
+                      <button
+                        key={wl.id}
+                        type="button"
+                        onClick={() =>
+                          setRestaurantForm((f) => ({
+                            ...f,
+                            workLocationIds: checked
+                              ? f.workLocationIds.filter((id) => id !== wl.id)
+                              : [...f.workLocationIds, wl.id],
+                          }))
+                        }
+                        className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition ${
+                          checked
+                            ? "border-indigo-500 bg-indigo-50 text-indigo-600"
+                            : "border-gray-200 bg-white text-slate-500 hover:border-indigo-300"
+                        }`}
+                      >
+                        <Check className={`h-3 w-3 ${checked ? "opacity-100" : "opacity-0"}`} />
+                        {wl.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <p className="text-[11px] text-slate-400">
+                {restaurantForm.workLocationIds.length === 0
+                  ? "선택 안 하면 모든 근무지에서 표시돼요."
+                  : `${restaurantForm.workLocationIds.length}개 근무지 선택됨`}
+              </p>
             </div>
 
             {/* 주소 + 지도 */}
@@ -1697,11 +1723,15 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
                       <MapPin className="h-2.5 w-2.5 shrink-0" />{r.address}
                     </p>
                   )}
-                  {r.workLocationId && (
-                    <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-600">
-                      <MapPin className="h-2.5 w-2.5" />
-                      {workLocations.find((wl) => wl.id === r.workLocationId)?.name ?? r.workLocationId}
-                    </span>
+                  {r.workLocationIds && r.workLocationIds.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {r.workLocationIds.map((id) => (
+                        <span key={id} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-600">
+                          <MapPin className="h-2.5 w-2.5" />
+                          {workLocations.find((wl) => wl.id === id)?.name ?? id}
+                        </span>
+                      ))}
+                    </div>
                   )}
                 </div>
                 <button

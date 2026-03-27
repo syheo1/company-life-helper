@@ -425,7 +425,7 @@ export default function DashboardPage() {
   function pickLunch() {
     const filtered =
       selectedWorkLocationId
-        ? restaurants.filter((r) => r.workLocationId === selectedWorkLocationId)
+        ? restaurants.filter((r) => r.workLocationIds?.includes(selectedWorkLocationId) ?? false)
         : restaurants;
     const pool = filtered.length > 0 ? filtered : (restaurants.length > 0 ? restaurants : FALLBACK_RESTAURANTS);
     setIsPickingLunch(true);
@@ -762,7 +762,7 @@ export default function DashboardPage() {
                   <p className="mb-12 text-sm font-medium leading-relaxed text-slate-400">
                     {(() => {
                       const filtered = selectedWorkLocationId
-                        ? restaurants.filter((r) => r.workLocationId === selectedWorkLocationId)
+                        ? restaurants.filter((r) => r.workLocationIds?.includes(selectedWorkLocationId) ?? false)
                         : restaurants;
                       if (filtered.length > 0) {
                         const locName = workLocations.find((l) => l.id === selectedWorkLocationId)?.name;
@@ -806,7 +806,7 @@ export default function DashboardPage() {
                 {/* Restaurant list */}
                 {(() => {
                   const visible = selectedWorkLocationId
-                    ? restaurants.filter((r) => r.workLocationId === selectedWorkLocationId)
+                    ? restaurants.filter((r) => r.workLocationIds?.includes(selectedWorkLocationId) ?? false)
                     : restaurants;
                   if (visible.length === 0) return null;
                   return (

@@ -76,7 +76,7 @@ export interface Restaurant {
   rating: number;
   walkMinutes: number;
   teamId: string;
-  workLocationId?: string;
+  workLocationIds?: string[];
   address?: string;
   lat?: number;
   lon?: number;
