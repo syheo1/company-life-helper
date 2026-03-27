@@ -181,7 +181,7 @@ export default function FrontLoginPage() {
               />
               <div>
                 <p className="text-sm font-bold uppercase tracking-[0.22em] text-blue-600">
-                  Life Helper
+                  Diware Life Helper
                 </p>
                 <h2 className="mt-1 text-3xl font-black">로그인</h2>
               </div>
@@ -227,7 +227,7 @@ export default function FrontLoginPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-4 text-sm font-bold text-white shadow-lg shadow-blue-100 transition hover:scale-[1.01] hover:bg-blue-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-400"
+                className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-4 text-sm font-bold text-white shadow-lg shadow-blue-100 transition hover:scale-[1.01] hover:bg-blue-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-400"
               >
                 {isSubmitting ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -241,20 +241,20 @@ export default function FrontLoginPage() {
             <div className="mt-6 space-y-3">
               <Link
                 href="/signup"
-                className="block rounded-2xl bg-slate-50 px-4 py-3 text-center text-sm font-bold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
+                className="block cursor-pointer rounded-2xl bg-slate-50 px-4 py-3 text-center text-sm font-bold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
               >
                 아직 계정이 없으신가요? 회원가입
-              </Link>
-              <Link
-                href="/admin/login"
-                className="block text-center text-sm font-bold text-slate-400 transition hover:text-slate-700"
-              >
-                관리자(어드민)이신가요?
               </Link>
             </div>
           </div>
         </section>
       </div>
+      <Link
+        href="/admin/login"
+        className="fixed bottom-4 right-5 cursor-pointer text-[10px] text-slate-300 transition-colors hover:text-slate-400"
+      >
+        v1.0.0
+      </Link>
     </main>
   );
 }

@@ -12,13 +12,11 @@ import {
   setDoc,
 } from "firebase/firestore";
 import {
-  ArrowRight,
-  CloudSun,
   Loader2,
   ShieldCheck,
-  Sparkles,
   UserPlus,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
@@ -87,13 +85,8 @@ export default function FrontSignupPage() {
         const teamSnapshot = await getDocs(query(collection(db, "teams"), orderBy("name")));
         const nextTeams = teamSnapshot.docs.map((teamDoc) => {
           const data = teamDoc.data() as Omit<Team, "id">;
-
-          return {
-            id: teamDoc.id,
-            ...data,
-          };
+          return { id: teamDoc.id, ...data };
         });
-
         setTeams(nextTeams);
       } catch (loadError) {
         setError(toErrorMessage(loadError));
@@ -162,79 +155,88 @@ export default function FrontSignupPage() {
   const noTeamsAvailable = !isLoadingTeams && teams.length === 0;
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-6 py-8 lg:px-10">
-        <header className="flex items-center justify-between rounded-[2rem] border border-white/60 bg-white/80 px-6 py-4 shadow-sm backdrop-blur">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-200">
-              <Sparkles className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-lg font-black tracking-tight">Life Helper</p>
-              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
-                신규 가입
-              </p>
-            </div>
-          </div>
-
-          <div className="hidden items-center gap-3 rounded-full border border-slate-100 bg-white px-4 py-2 text-sm font-bold shadow-sm sm:flex">
-            <CloudSun className="h-4 w-4 text-blue-500" />
-            <span>Today</span>
-            <span className="text-slate-300">|</span>
-            <span className="font-medium text-slate-600">Team Onboarding</span>
-          </div>
-        </header>
-
-        <div className="grid flex-1 items-center gap-8 py-8 lg:grid-cols-[1.08fr_0.92fr]">
-          <section className="space-y-6">
-            <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-blue-600 to-indigo-700 p-8 text-white shadow-2xl shadow-blue-200 lg:p-12">
-              <div className="relative z-10">
-                <span className="inline-flex rounded-full bg-white/20 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em]">
-                  새 멤버 합류
-                </span>
-                <h1 className="mt-5 text-4xl font-black leading-tight lg:text-6xl">
-                  팀과 함께
-                  <br />
-                  시작해보세요 🙌
-                </h1>
-                <p className="mt-5 max-w-2xl text-sm leading-7 text-blue-100 lg:text-base">
-                  이메일로 간편하게 가입하고, 팀 승인 후 점심 추천·팀 일정·공지사항 등
-                  다양한 기능을 바로 이용할 수 있어요.
-                </p>
-
-                <div className="mt-10 grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-[1.75rem] bg-white/12 p-5 backdrop-blur">
-                    <ShieldCheck className="h-5 w-5 text-cyan-200" />
-                    <p className="mt-3 text-lg font-bold">승인 후 바로 시작</p>
-                    <p className="mt-2 text-sm text-blue-100">
-                      가입 후 팀장 승인이 완료되면 대시보드가 열려요.
-                    </p>
-                  </div>
-                  <div className="rounded-[1.75rem] bg-white/12 p-5 backdrop-blur">
-                    <ArrowRight className="h-5 w-5 text-cyan-200" />
-                    <p className="mt-3 text-lg font-bold">팀 선택 가입</p>
-                    <p className="mt-2 text-sm text-blue-100">
-                      소속 팀을 선택해서 팀 맞춤 기능을 이용하세요.
-                    </p>
-                  </div>
-                </div>
+    <main className="min-h-screen bg-slate-50 text-slate-900 flex items-center">
+      <div className="mx-auto grid w-full max-w-7xl gap-8 px-6 py-8 lg:grid-cols-2 lg:px-10">
+        {/* Left panel */}
+        <section className="flex flex-col rounded-[2.5rem] bg-gradient-to-br from-blue-600 to-indigo-700 p-8 text-white shadow-2xl shadow-blue-200 lg:p-10">
+          <div>
+            <div className="flex items-center gap-4">
+              <div className="rounded-2xl bg-white/14 p-2.5 backdrop-blur">
+                <Image
+                  src="/image/logo.png"
+                  alt="디아이웨어 라이프 헬퍼 로고"
+                  width={48}
+                  height={48}
+                  className="h-10 w-10 object-contain"
+                  priority
+                />
               </div>
-
-              <div className="absolute -bottom-12 -right-10 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
+              <div>
+                <p className="text-base font-black tracking-tight">디아이웨어 라이프 헬퍼</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-blue-100/80">
+                  Diware Life Helper
+                </p>
+              </div>
             </div>
-          </section>
 
-          <section className="rounded-[2.25rem] border border-white/60 bg-white/85 p-8 shadow-xl shadow-slate-200/70 backdrop-blur lg:p-9">
-            <p className="text-sm font-bold uppercase tracking-[0.22em] text-blue-600">
-              Life Helper
+            <h1 className="mt-10 text-3xl font-black leading-tight lg:text-4xl">
+              팀과 함께
+              <br />
+              시작해보세요 👋
+            </h1>
+            <p className="mt-4 max-w-2xl text-xs leading-6 text-blue-100 lg:text-sm">
+              이메일로 간편하게 가입하고, 팀 승인 후 점심 추천부터
+              팀 일정, 공지사항까지 한곳에서 바로 이용할 수 있어요.
             </p>
-            <h2 className="mt-3 text-3xl font-black text-slate-900">회원가입</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-500">
-              이메일로 가입하고 팀 승인 후 Life Helper의 모든 기능을 이용하세요.
+
+            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-[1.5rem] bg-white/12 p-4 backdrop-blur">
+                <ShieldCheck className="h-5 w-5 text-cyan-200" />
+                <p className="mt-3 text-base font-bold">승인 후 바로 시작</p>
+                <p className="mt-1 text-xs text-blue-100">
+                  가입 후 팀장 승인이 완료되면 대시보드가 열려요
+                </p>
+              </div>
+              <div className="rounded-[1.5rem] bg-white/12 p-4 backdrop-blur">
+                <UserPlus className="h-5 w-5 text-cyan-200" />
+                <p className="mt-3 text-base font-bold">팀 선택 가입</p>
+                <p className="mt-1 text-xs text-blue-100">
+                  소속 팀을 선택해서 팀 맞춤 기능을 이용하세요
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8 rounded-[1.25rem] border border-white/15 bg-white/10 p-4 text-xs text-blue-100">
+            이미 계정이 있으신가요? 오른쪽 하단 로그인 버튼을 눌러 바로 시작하세요.
+          </div>
+        </section>
+
+        {/* Right panel — form */}
+        <section className="flex items-center justify-center">
+          <div className="w-full max-w-md rounded-[2.25rem] border border-white/60 bg-white/90 p-8 text-slate-900 shadow-2xl shadow-slate-200/70 backdrop-blur lg:p-9">
+            <div className="mb-6 flex items-center gap-3">
+              <Image
+                src="/image/logo.png"
+                alt="디아이웨어 라이프 헬퍼"
+                width={48}
+                height={48}
+                className="h-12 w-12 object-contain"
+              />
+              <div>
+                <p className="text-sm font-bold uppercase tracking-[0.22em] text-blue-600">
+                  Diware Life Helper
+                </p>
+                <h2 className="mt-1 text-3xl font-black">회원가입</h2>
+              </div>
+            </div>
+
+            <p className="text-sm leading-6 text-slate-500">
+              회사 이메일로 가입하고 팀 승인 후 Life Helper 포털을 이용하세요.
             </p>
 
             <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
-              <div className="grid gap-5 md:grid-cols-2">
+              <div className="grid gap-5 sm:grid-cols-2">
                 <label className="block">
                   <span className="mb-2 block text-sm font-bold text-slate-700">이름</span>
                   <input
@@ -250,7 +252,7 @@ export default function FrontSignupPage() {
                 <label className="block">
                   <span className="mb-2 block text-sm font-bold text-slate-700">소속 팀</span>
                   <select
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                    className="w-full cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
                     value={form.teamId}
                     onChange={(event) =>
                       setForm((current) => ({ ...current, teamId: event.target.value }))
@@ -286,7 +288,7 @@ export default function FrontSignupPage() {
                 />
               </label>
 
-              <div className="grid gap-5 md:grid-cols-2">
+              <div className="grid gap-5 sm:grid-cols-2">
                 <label className="block">
                   <span className="mb-2 block text-sm font-bold text-slate-700">비밀번호</span>
                   <input
@@ -316,7 +318,7 @@ export default function FrontSignupPage() {
 
               {noTeamsAvailable ? (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-                  아직 생성된 팀이 없습니다. 어드민이 먼저 팀을 만든 뒤 가입할 수 있습니다.
+                  아직 생성된 팀이 없습니다. 관리자가 팀을 만든 뒤 가입할 수 있어요.
                 </div>
               ) : null}
 
@@ -329,7 +331,7 @@ export default function FrontSignupPage() {
               <button
                 type="submit"
                 disabled={isSubmitting || isLoadingTeams || noTeamsAvailable}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-4 text-sm font-bold text-white shadow-lg shadow-blue-100 transition hover:scale-[1.01] hover:bg-blue-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-400"
+                className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-4 text-sm font-bold text-white shadow-lg shadow-blue-100 transition hover:scale-[1.01] hover:bg-blue-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-400"
               >
                 {isSubmitting ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -340,23 +342,25 @@ export default function FrontSignupPage() {
               </button>
             </form>
 
-            <div className="mt-6 space-y-3">
+            <div className="mt-6">
               <Link
                 href="/login"
-                className="block rounded-2xl bg-slate-50 px-4 py-3 text-center text-sm font-bold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
+                className="block cursor-pointer rounded-2xl bg-slate-50 px-4 py-3 text-center text-sm font-bold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
               >
                 이미 계정이 있으신가요? 로그인
               </Link>
-              <Link
-                href="/admin/signup"
-                className="block text-center text-sm font-bold text-slate-400 transition hover:text-slate-700"
-              >
-                관리자(어드민)로 가입하기
-              </Link>
             </div>
-          </section>
-        </div>
+          </div>
+        </section>
       </div>
+
+      {/* Hidden admin signup link */}
+      <Link
+        href="/admin/signup"
+        className="fixed bottom-4 right-5 cursor-pointer text-[10px] text-slate-300 transition-colors hover:text-slate-400"
+      >
+        v1.0.0
+      </Link>
     </main>
   );
 }

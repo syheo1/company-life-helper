@@ -4,11 +4,15 @@ import {
   Bell,
   CalendarDays,
   CheckSquare,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CloudSun,
   House,
+  Loader2,
   LogOut,
+  MapPin,
+  RefreshCw,
   Shield,
   Sparkles,
   Utensils,
@@ -82,11 +86,11 @@ const MONTH_NAMES = [
 ];
 
 const FALLBACK_RESTAURANTS: Restaurant[] = [
-  { id: "f1", name: "성수 진라멘", category: "일식", rating: 4.8, walkMinutes: 5, teamId: "", createdAt: 0 },
-  { id: "f2", name: "감성 타코랩", category: "멕시칸", rating: 4.7, walkMinutes: 7, teamId: "", createdAt: 0 },
-  { id: "f3", name: "오늘의 가정식", category: "한식", rating: 4.5, walkMinutes: 3, teamId: "", createdAt: 0 },
-  { id: "f4", name: "버거보이", category: "양식", rating: 4.6, walkMinutes: 4, teamId: "", createdAt: 0 },
-  { id: "f5", name: "샐러드포", category: "건강식", rating: 4.9, walkMinutes: 10, teamId: "", createdAt: 0 },
+  { id: "f1", name: "성수 진라멘", category: "일식", rating: 4.8, walkMinutes: 5, teamId: "", externalUrl: "", createdAt: 0 },
+  { id: "f2", name: "감성 타코랩", category: "멕시칸", rating: 4.7, walkMinutes: 7, teamId: "", externalUrl: "", createdAt: 0 },
+  { id: "f3", name: "오늘의 가정식", category: "한식", rating: 4.5, walkMinutes: 3, teamId: "", externalUrl: "", createdAt: 0 },
+  { id: "f4", name: "버거보이", category: "양식", rating: 4.6, walkMinutes: 4, teamId: "", externalUrl: "", createdAt: 0 },
+  { id: "f5", name: "샐러드포", category: "건강식", rating: 4.9, walkMinutes: 10, teamId: "", externalUrl: "", createdAt: 0 },
 ];
 
 function getCookie(name: string): string {
@@ -124,6 +128,9 @@ export default function DashboardPage() {
   // Lunch roulette
   const [pickedLunch, setPickedLunch] = useState<Restaurant | null>(null);
   const [isPickingLunch, setIsPickingLunch] = useState(false);
+  const [rollingName, setRollingName] = useState<string>("");
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const locationDropdownRef = useRef<HTMLDivElement>(null);
 
   // Weather
   const [weather, setWeather] = useState<WeatherData | null>(null);
@@ -161,7 +168,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!teamId) return;
     const { db } = getFirebaseClient();
-    const q = query(collection(db, "polls"), where("teamId", "==", teamId));
+    const q = query(collection(db, "polls"), where("teamId", "in", [teamId, "common"]));
     const unsub = onSnapshot(
       q,
       (snapshot) => {
@@ -185,6 +192,17 @@ export default function DashboardPage() {
     votedChecked.current = true;
     void checkVotedPolls(polls);
   }, [uid, polls]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Close location dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (locationDropdownRef.current && !locationDropdownRef.current.contains(e.target as Node)) {
+        setShowLocationDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   // Refresh tab-specific data on tab change
   useEffect(() => {
@@ -309,7 +327,7 @@ export default function DashboardPage() {
     console.log("[fetchNotices] teamId:", teamId);
     const { db } = getFirebaseClient();
     const snap = await getDocs(
-      query(collection(db, "notices"), where("teamId", "==", teamId)),
+      query(collection(db, "notices"), where("teamId", "in", [teamId, "common"])),
     );
     console.log("[fetchNotices] count:", snap.size);
     const list = snap.docs.map((d) => d.data() as Notice);
@@ -325,7 +343,7 @@ export default function DashboardPage() {
     console.log("[fetchCalendarEvents] teamId:", teamId);
     const { db } = getFirebaseClient();
     const snap = await getDocs(
-      query(collection(db, "calendarEvents"), where("teamId", "==", teamId)),
+      query(collection(db, "calendarEvents"), where("teamId", "in", [teamId, "common"])),
     );
     console.log("[fetchCalendarEvents] count:", snap.size);
     const list = snap.docs.map((d) => d.data() as CalendarEvent);
@@ -352,6 +370,10 @@ export default function DashboardPage() {
     const list = snap.docs.map((d) => d.data() as WorkLocation);
     list.sort((a, b) => a.createdAt - b.createdAt);
     setWorkLocations(list);
+    if (list.length > 0) {
+      const kdb = list.find((l) => l.name.includes("KDB생명타워"));
+      setSelectedWorkLocationId((kdb ?? list[0]).id);
+    }
   }
 
   async function checkVotedPolls(pollList: Poll[]) {
@@ -423,17 +445,36 @@ export default function DashboardPage() {
   }
 
   function pickLunch() {
-    const filtered =
-      selectedWorkLocationId
-        ? restaurants.filter((r) => r.workLocationIds?.includes(selectedWorkLocationId) ?? false)
-        : restaurants;
+    const filtered = restaurants.filter(
+      (r) => !selectedWorkLocationId || (r.workLocationIds?.includes(selectedWorkLocationId) ?? false),
+    );
     const pool = filtered.length > 0 ? filtered : (restaurants.length > 0 ? restaurants : FALLBACK_RESTAURANTS);
+    const finalPick = pool[Math.floor(Math.random() * pool.length)];
+    const names = pool.map((r) => r.name);
+
     setIsPickingLunch(true);
     setPickedLunch(null);
+    setRollingName("");
+
+    // Slot machine: fast → medium → slow → land
+    const schedule = [
+      ...Array(10).fill(65),
+      ...Array(7).fill(140),
+      ...Array(4).fill(270),
+    ];
+    let elapsed = 0;
+    schedule.forEach((delay, i) => {
+      elapsed += delay;
+      window.setTimeout(() => setRollingName(names[i % names.length]), elapsed);
+    });
+    elapsed += 200;
     window.setTimeout(() => {
-      setPickedLunch(pool[Math.floor(Math.random() * pool.length)]);
-      setIsPickingLunch(false);
-    }, 1200);
+      setRollingName(finalPick.name);
+      window.setTimeout(() => {
+        setPickedLunch(finalPick);
+        setIsPickingLunch(false);
+      }, 480);
+    }, elapsed);
   }
 
   async function handleLogout() {
@@ -495,17 +536,28 @@ export default function DashboardPage() {
     <main className="flex h-screen w-full overflow-hidden bg-slate-50 text-slate-900 antialiased">
       {/* Sidebar */}
       <aside className="hidden w-72 shrink-0 flex-col border-r border-slate-100 bg-white p-8 lg:flex">
-        <div className="mb-12 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 p-2 text-white shadow-lg shadow-blue-200">
-            <Image
-              src="/image/logo.png"
-              alt="Company Life Helper"
-              width={32}
-              height={32}
-              className="h-7 w-7 object-contain"
-            />
+        <div className="mb-10">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 p-2 text-white shadow-lg shadow-blue-200">
+              <Image
+                src="/image/logo.png"
+                alt="Company Life Helper"
+                width={32}
+                height={32}
+                className="h-7 w-7 object-contain"
+              />
+            </div>
+            <div>
+              <h1 className="text-base font-black tracking-tight">Diware Life Helper</h1>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">디아이웨어</p>
+            </div>
           </div>
-          <h1 className="text-xl font-bold tracking-tight">Life Helper</h1>
+          {teamName && (
+            <div className="mt-4 rounded-2xl bg-blue-50 px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Team</p>
+              <p className="mt-0.5 text-sm font-black text-blue-700">{teamName}</p>
+            </div>
+          )}
         </div>
 
         <nav className="flex-1 space-y-2">
@@ -597,7 +649,7 @@ export default function DashboardPage() {
         </header>
 
         <div className="custom-scroll flex-1 overflow-y-auto px-6 pb-24 pt-6 lg:px-10 lg:pb-10">
-          <div className="mx-auto max-w-5xl space-y-8">
+          <div className="mx-auto max-w-7xl space-y-8">
 
             {/* Home tab */}
             {activeTab === "home" && (
@@ -718,120 +770,249 @@ export default function DashboardPage() {
 
             {/* Lunch tab */}
             {activeTab === "lunch" && (
-              <section className="rounded-[2.5rem] border border-slate-100 bg-white p-10 shadow-sm md:p-16">
-                <div className="mx-auto max-w-md text-center">
-                  <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-3xl bg-orange-50 text-orange-500">
-                    <Utensils className={`h-9 w-9 ${isPickingLunch ? "animate-bounce" : ""}`} />
-                  </div>
-                  <h3 className="mb-4 text-2xl font-black leading-tight">오늘의 점심 룰렛</h3>
-
-                  {/* Work location selector */}
-                  {workLocations.length > 0 && (
-                    <div className="mb-8">
-                      <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                        근무지 선택
-                      </p>
-                      <div className="flex flex-wrap justify-center gap-2">
-                        <button
-                          onClick={() => { setSelectedWorkLocationId(""); setPickedLunch(null); }}
-                          className={`rounded-full px-4 py-2 text-xs font-bold transition-all ${
-                            selectedWorkLocationId === ""
-                              ? "bg-orange-500 text-white shadow-md shadow-orange-100"
-                              : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                          }`}
-                        >
-                          전체
-                        </button>
-                        {workLocations.map((loc) => (
-                          <button
-                            key={loc.id}
-                            onClick={() => { setSelectedWorkLocationId(loc.id); setPickedLunch(null); }}
-                            className={`rounded-full px-4 py-2 text-xs font-bold transition-all ${
-                              selectedWorkLocationId === loc.id
-                                ? "bg-orange-500 text-white shadow-md shadow-orange-100"
-                                : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                            }`}
-                          >
-                            {loc.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <p className="mb-12 text-sm font-medium leading-relaxed text-slate-400">
-                    {(() => {
-                      const filtered = selectedWorkLocationId
-                        ? restaurants.filter((r) => r.workLocationIds?.includes(selectedWorkLocationId) ?? false)
-                        : restaurants;
-                      if (filtered.length > 0) {
-                        const locName = workLocations.find((l) => l.id === selectedWorkLocationId)?.name;
-                        return locName
-                          ? `${locName} 맛집 ${filtered.length}곳 중에서 골라드립니다.`
-                          : `팀 맛집 ${filtered.length}곳 중에서 오늘 점심을 골라드립니다.`;
-                      }
-                      return "등록된 맛집이 없어 기본 추천 목록을 사용합니다.";
-                    })()}
-                  </p>
-
-                  {pickedLunch && (
-                    <div className="mb-12 overflow-hidden rounded-[2rem] border-2 border-dashed border-orange-200 bg-orange-50">
-                      <div className="p-8">
-                        <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-orange-500">
-                          오늘의 메뉴
-                        </span>
-                        <h4 className="text-3xl font-black text-slate-900">{pickedLunch.name}</h4>
-                        <p className="mt-2 text-sm font-bold text-slate-500">
-                          {pickedLunch.category} · ⭐ {pickedLunch.rating} · 도보 {pickedLunch.walkMinutes}분
-                        </p>
-                        {pickedLunch.address && (
-                          <p className="mt-1 text-xs text-slate-400">{pickedLunch.address}</p>
-                        )}
-                      </div>
-                      {pickedLunch.lat && pickedLunch.lon && (
-                        <RestaurantMapView lat={pickedLunch.lat} lon={pickedLunch.lon} name={pickedLunch.name} />
-                      )}
-                    </div>
-                  )}
-
-                  <button
-                    onClick={pickLunch}
-                    disabled={isPickingLunch}
-                    className="w-full rounded-3xl bg-orange-500 py-5 text-lg font-black text-white shadow-xl shadow-orange-100 transition-all hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:bg-orange-300"
-                  >
-                    {isPickingLunch ? "추천 메뉴를 고르는 중..." : "랜덤 추천 시작"}
-                  </button>
+              <section className="relative overflow-hidden rounded-[2.5rem] border border-slate-100 bg-white px-6 py-14 shadow-sm">
+                {/* Background decorative food emojis */}
+                <div className="pointer-events-none absolute inset-0 select-none overflow-hidden">
+                  {["🍜", "🍱", "🍔", "🍣", "🌮", "🍛", "🥗", "🍝", "🍤", "🥩"].map((emoji, i) => (
+                    <span
+                      key={i}
+                      className="absolute opacity-[0.15]"
+                      style={{
+                        top: `${10 + (i * 17) % 80}%`,
+                        left: `${5 + (i * 23) % 90}%`,
+                        transform: `rotate(${(i * 37) % 60 - 30}deg)`,
+                        fontSize: `${2.5 + (i % 3)}rem`,
+                      }}
+                    >
+                      {emoji}
+                    </span>
+                  ))}
                 </div>
 
-                {/* Restaurant list */}
-                {(() => {
-                  const visible = selectedWorkLocationId
-                    ? restaurants.filter((r) => r.workLocationIds?.includes(selectedWorkLocationId) ?? false)
-                    : restaurants;
-                  if (visible.length === 0) return null;
-                  return (
-                    <div className="mx-auto mt-12 max-w-md">
-                      <p className="mb-4 text-center text-[10px] font-black uppercase tracking-widest text-slate-300">
-                        {selectedWorkLocationId
-                          ? `${workLocations.find((l) => l.id === selectedWorkLocationId)?.name ?? ""} 맛집 목록`
-                          : "팀 맛집 목록"}
-                      </p>
-                      <div className="space-y-3">
-                        {visible.map((r) => (
-                          <div
-                            key={r.id}
-                            className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4"
-                          >
-                            <span className="text-sm font-bold text-slate-700">{r.name}</span>
-                            <span className="text-xs font-medium text-slate-400">
-                              {r.category} · ⭐ {r.rating} · {r.walkMinutes}분
-                            </span>
+                {/* Header */}
+                <div className="relative mb-10 text-center">
+                  <p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-400">
+                    Lunch Roulette 🎰
+                  </p>
+                  <h3 className="mt-2 text-3xl font-black text-slate-800">오늘 뭐 먹지?</h3>
+                </div>
+
+                {/* Two-column layout */}
+                <div className="relative flex flex-col items-center gap-10 lg:flex-row lg:items-start lg:justify-center">
+
+                  {/* Left — controls */}
+                  <div className="flex w-full max-w-xs flex-col items-center">
+                    {/* Work location selector */}
+                    {workLocations.length > 0 && (
+                      <div ref={locationDropdownRef} className="relative mb-6 w-full">
+                        <button
+                          onClick={() => setShowLocationDropdown((v) => !v)}
+                          className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3.5 text-sm font-bold text-slate-700 transition-all hover:border-indigo-300 hover:bg-indigo-50"
+                        >
+                          <span className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-indigo-400" />
+                            {workLocations.find((l) => l.id === selectedWorkLocationId)?.name ?? "근무지 선택"}
+                          </span>
+                          <ChevronDown
+                            className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${showLocationDropdown ? "rotate-180" : ""}`}
+                          />
+                        </button>
+                        {showLocationDropdown && (
+                          <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl shadow-slate-200/60">
+                            {workLocations.map((loc) => (
+                              <button
+                                key={loc.id}
+                                onClick={() => {
+                                  setSelectedWorkLocationId(loc.id);
+                                  setPickedLunch(null);
+                                  setRollingName("");
+                                  setShowLocationDropdown(false);
+                                }}
+                                className={`flex w-full items-center gap-3 px-5 py-3.5 text-left text-sm font-bold transition-colors ${
+                                  selectedWorkLocationId === loc.id
+                                    ? "bg-indigo-50 text-indigo-600"
+                                    : "text-slate-600 hover:bg-slate-50"
+                                }`}
+                              >
+                                <MapPin className="h-4 w-4 shrink-0" />
+                                {loc.name}
+                                {selectedWorkLocationId === loc.id && (
+                                  <span className="ml-auto h-2 w-2 rounded-full bg-indigo-400" />
+                                )}
+                              </button>
+                            ))}
                           </div>
-                        ))}
+                        )}
+                      </div>
+                    )}
+
+                    {/* Slot machine */}
+                    <div className="mb-6 w-full">
+                      {/* Gold outer frame */}
+                      <div className="rounded-[2rem] bg-gradient-to-b from-amber-300 via-yellow-500 to-amber-700 p-[3px] shadow-2xl shadow-amber-500/30">
+                        {/* Machine body */}
+                        <div className="rounded-[calc(2rem-3px)] bg-gradient-to-b from-slate-800 via-slate-900 to-slate-800 px-4 pb-5 pt-4">
+                          {/* LED lights */}
+                          <div className="mb-4 flex items-center justify-center gap-2">
+                            {["bg-red-500","bg-amber-400","bg-green-400","bg-sky-400","bg-violet-500","bg-pink-500","bg-amber-400","bg-green-400"].map((c, i) => (
+                              <span
+                                key={i}
+                                className={`h-2 w-2 rounded-full ${c} transition-opacity duration-300 ${isPickingLunch ? "opacity-100" : "opacity-30"}`}
+                                style={isPickingLunch ? { animationDelay: `${i * 80}ms` } : {}}
+                              />
+                            ))}
+                          </div>
+
+                          {/* Reel window */}
+                          <div className="overflow-hidden rounded-2xl border-2 border-slate-700 bg-black">
+                            <div className="flex divide-x divide-slate-700">
+                              {/* Left reel - decorative */}
+                              <div className="flex w-14 shrink-0 flex-col items-center justify-center gap-1 bg-slate-950 py-6">
+                                {["🍜","🍔","🍣"].map((e, i) => (
+                                  <span
+                                    key={i}
+                                    className="text-xl leading-none"
+                                    style={{
+                                      opacity: isPickingLunch ? 1 : 0.25,
+                                      filter: isPickingLunch ? "blur(1.5px)" : "none",
+                                      transition: "all 0.1s",
+                                    }}
+                                  >
+                                    {e}
+                                  </span>
+                                ))}
+                              </div>
+
+                              {/* Center reel - main */}
+                              <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden bg-slate-950 py-8">
+                                {/* Glow when spinning */}
+                                {isPickingLunch && (
+                                  <div className="absolute inset-0 bg-indigo-500/10 shadow-[inset_0_0_30px_rgba(99,102,241,0.4)]" />
+                                )}
+                                {/* Top & bottom fade */}
+                                <div className="absolute left-0 right-0 top-0 z-10 h-8 bg-gradient-to-b from-black to-transparent" />
+                                <div className="absolute bottom-0 left-0 right-0 z-10 h-8 bg-gradient-to-t from-black to-transparent" />
+                                {/* Center win line */}
+                                <div className="absolute left-0 right-0 top-1/2 z-10 -translate-y-px border-t border-amber-400/50" />
+
+                                {isPickingLunch ? (
+                                  <p
+                                    className="relative z-20 px-4 text-center text-xl font-black leading-tight text-white"
+                                    style={{ filter: "blur(0.7px)", transform: "scaleY(0.93)" }}
+                                  >
+                                    {rollingName || "..."}
+                                  </p>
+                                ) : pickedLunch ? (
+                                  <p className="relative z-20 px-4 text-center text-xl font-black leading-tight text-amber-300">
+                                    {pickedLunch.name}
+                                  </p>
+                                ) : (
+                                  <p className="relative z-20 px-4 text-center text-xs font-semibold leading-6 text-slate-600">
+                                    버튼을 눌러<br />뽑아보세요!
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Right reel - decorative */}
+                              <div className="flex w-14 shrink-0 flex-col items-center justify-center gap-1 bg-slate-950 py-6">
+                                {["🌮","🥗","🍛"].map((e, i) => (
+                                  <span
+                                    key={i}
+                                    className="text-xl leading-none"
+                                    style={{
+                                      opacity: isPickingLunch ? 1 : 0.25,
+                                      filter: isPickingLunch ? "blur(1.5px)" : "none",
+                                      transition: "all 0.1s",
+                                    }}
+                                  >
+                                    {e}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Bottom coin slot decoration */}
+                          <div className="mt-4 flex items-center justify-center gap-3">
+                            <div className="h-px flex-1 bg-slate-700" />
+                            <div className="h-1.5 w-8 rounded-full bg-slate-600" />
+                            <div className="h-px flex-1 bg-slate-700" />
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  );
-                })()}
+
+                    {/* Spin button */}
+                    <button
+                      onClick={pickLunch}
+                      disabled={isPickingLunch}
+                      className="w-full cursor-pointer rounded-2xl bg-indigo-600 px-8 py-4 text-lg font-black text-white shadow-lg shadow-indigo-200 transition-all hover:scale-105 hover:bg-indigo-700 active:scale-95 disabled:scale-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isPickingLunch ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          돌아가는 중...
+                        </span>
+                      ) : pickedLunch ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <RefreshCw className="h-5 w-5" />
+                          다시 뽑기
+                        </span>
+                      ) : (
+                        "돌려돌려! 🎰"
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Right — result */}
+                  <div className="w-full max-w-sm">
+                    {pickedLunch && !isPickingLunch ? (
+                      <div className="overflow-hidden rounded-[2rem] border border-slate-100 bg-white shadow-lg shadow-slate-200/60">
+                        <div className="p-6">
+                          <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-indigo-400">
+                            🎉 오늘의 선택
+                          </p>
+                          <div className="flex items-start gap-2">
+                            <h4 className="text-2xl font-black text-slate-900">{pickedLunch.name}</h4>
+                            {pickedLunch.externalUrl && (
+                              <a
+                                href={pickedLunch.externalUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-1 shrink-0 rounded-lg bg-green-50 px-2 py-0.5 text-[10px] font-bold text-green-600 transition hover:bg-green-100"
+                              >
+                                네이버 ↗
+                              </a>
+                            )}
+                          </div>
+                          <p className="mt-2 text-xs font-bold text-slate-500">
+                            {pickedLunch.category} · ⭐ {pickedLunch.rating} · 도보 {pickedLunch.walkMinutes}분
+                          </p>
+                          {pickedLunch.address && (
+                            <p className="mt-1 text-xs text-slate-400">{pickedLunch.address}</p>
+                          )}
+                          {pickedLunch.recommendedMenus && (
+                            <p className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-500">
+                              🍽 {pickedLunch.recommendedMenus}
+                            </p>
+                          )}
+                          {pickedLunch.notes && (
+                            <p className="mt-2 text-xs italic text-slate-400">💬 {pickedLunch.notes}</p>
+                          )}
+                        </div>
+                        {pickedLunch.lat && pickedLunch.lon && (
+                          <RestaurantMapView lat={pickedLunch.lat} lon={pickedLunch.lon} name={pickedLunch.name} />
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex h-full min-h-[260px] flex-col items-center justify-center rounded-[2rem] border border-dashed border-slate-200 bg-slate-50/50">
+                        <p className="text-3xl">🍽</p>
+                        <p className="mt-3 text-sm font-bold text-slate-300">결과가 여기에 표시돼요</p>
+                      </div>
+                    )}
+                  </div>
+
+                </div>
               </section>
             )}
 
@@ -937,134 +1118,155 @@ export default function DashboardPage() {
 
             {/* Calendar tab */}
             {activeTab === "calendar" && (
-              <section className="rounded-[2.5rem] border border-slate-100 bg-white p-8 shadow-sm lg:p-12">
-                <div className="mb-10 flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <h3 className="text-2xl font-black">팀 캘린더</h3>
-                    <p className="mt-1 text-sm font-medium text-slate-400">
-                      중요 일정과 기념일을 한눈에 확인하세요.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-4 rounded-2xl bg-slate-50 p-2">
-                    <button
-                      onClick={prevMonth}
-                      className="rounded-xl p-2.5 transition-all hover:bg-white hover:shadow-sm"
-                    >
-                      <ChevronLeft className="h-4 w-4 text-slate-400" />
-                    </button>
-                    <span className="px-4 font-bold text-slate-700">
-                      {calYear}년 {MONTH_NAMES[calMonth]}
-                    </span>
-                    <button
-                      onClick={nextMonth}
-                      className="rounded-xl p-2.5 transition-all hover:bg-white hover:shadow-sm"
-                    >
-                      <ChevronRight className="h-4 w-4 text-slate-400" />
-                    </button>
-                  </div>
-                </div>
+              <section className="flex flex-col gap-6 lg:flex-row lg:items-start">
 
-                <div className="grid grid-cols-7 gap-px overflow-hidden rounded-3xl border border-slate-100 bg-slate-100 shadow-sm">
-                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                    <div
-                      key={day}
-                      className="bg-slate-50 p-4 text-center text-[10px] font-black uppercase text-slate-300"
-                    >
-                      {day}
+                {/* Left — calendar */}
+                <div className="flex-1 overflow-hidden rounded-[2.5rem] border border-slate-100 bg-white p-8 shadow-sm">
+                  <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h3 className="text-2xl font-black">팀 캘린더</h3>
+                      <p className="mt-1 text-sm font-medium text-slate-400">
+                        중요 일정과 기념일을 한눈에 확인하세요.
+                      </p>
                     </div>
-                  ))}
+                    <div className="flex items-center gap-2 rounded-2xl bg-slate-50 p-2">
+                      <button
+                        onClick={prevMonth}
+                        className="cursor-pointer rounded-xl p-2.5 transition-all hover:bg-white hover:shadow-sm"
+                      >
+                        <ChevronLeft className="h-4 w-4 text-slate-400" />
+                      </button>
+                      <span className="px-3 font-bold text-slate-700">
+                        {calYear}년 {MONTH_NAMES[calMonth]}
+                      </span>
+                      <button
+                        onClick={nextMonth}
+                        className="cursor-pointer rounded-xl p-2.5 transition-all hover:bg-white hover:shadow-sm"
+                      >
+                        <ChevronRight className="h-4 w-4 text-slate-400" />
+                      </button>
+                    </div>
+                  </div>
 
-                  {/* Empty cells before first day */}
-                  {Array.from({ length: firstDayOfMonth }, (_, i) => (
-                    <div key={`empty-${i}`} className="bg-white" />
-                  ))}
-
-                  {/* Day cells */}
-                  {Array.from({ length: daysInMonth }, (_, i) => {
-                    const day = i + 1;
-                    const isToday =
-                      calYear === now.getFullYear() &&
-                      calMonth === now.getMonth() &&
-                      day === now.getDate();
-                    const dayEvents = monthEvents.filter((e) => {
-                      const eDate = new Date(e.date);
-                      return (
-                        eDate.getFullYear() === calYear &&
-                        eDate.getMonth() === calMonth &&
-                        eDate.getDate() === day
-                      );
-                    });
-
-                    return (
+                  <div className="grid grid-cols-7 gap-px overflow-hidden rounded-3xl border border-slate-100 bg-slate-100 shadow-sm">
+                    {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
                       <div
                         key={day}
-                        className="group relative min-h-24 cursor-pointer bg-white p-3 transition-colors hover:bg-blue-50/50 md:min-h-36"
+                        className="bg-slate-50 p-3 text-center text-[10px] font-black uppercase text-slate-300"
                       >
-                        <span
-                          className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold ${
-                            isToday
-                              ? "bg-blue-600 text-white"
-                              : dayEvents.length > 0
-                                ? "text-blue-600"
-                                : "text-slate-400"
-                          }`}
-                        >
-                          {day}
-                        </span>
-                        <div className="mt-1 space-y-1">
-                          {dayEvents.slice(0, 2).map((event) => (
-                            <div
-                              key={event.id}
-                              className="truncate rounded-lg bg-blue-100 p-1 text-[10px] font-bold text-blue-700"
-                            >
-                              {event.emoji} {event.title}
-                            </div>
-                          ))}
-                          {dayEvents.length > 2 && (
-                            <div className="text-[10px] font-bold text-slate-400">
-                              +{dayEvents.length - 2}개
-                            </div>
-                          )}
-                        </div>
+                        {day}
                       </div>
-                    );
-                  })}
+                    ))}
+
+                    {Array.from({ length: firstDayOfMonth }, (_, i) => (
+                      <div key={`empty-${i}`} className="bg-white" />
+                    ))}
+
+                    {Array.from({ length: daysInMonth }, (_, i) => {
+                      const day = i + 1;
+                      const isToday =
+                        calYear === now.getFullYear() &&
+                        calMonth === now.getMonth() &&
+                        day === now.getDate();
+                      const dayEvents = monthEvents.filter((e) => {
+                        const eDate = new Date(e.date);
+                        return (
+                          eDate.getFullYear() === calYear &&
+                          eDate.getMonth() === calMonth &&
+                          eDate.getDate() === day
+                        );
+                      });
+
+                      return (
+                        <div
+                          key={day}
+                          className="group relative min-h-20 cursor-pointer bg-white p-2 transition-colors hover:bg-blue-50/50"
+                        >
+                          <span
+                            className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold ${
+                              isToday
+                                ? "bg-blue-600 text-white"
+                                : dayEvents.length > 0
+                                  ? "text-blue-600"
+                                  : "text-slate-400"
+                            }`}
+                          >
+                            {day}
+                          </span>
+                          <div className="mt-1 space-y-0.5">
+                            {dayEvents.slice(0, 2).map((event) => (
+                              <div
+                                key={event.id}
+                                className="truncate rounded-md bg-blue-100 px-1 py-0.5 text-[9px] font-bold text-blue-700"
+                              >
+                                {event.emoji} {event.title}
+                              </div>
+                            ))}
+                            {dayEvents.length > 2 && (
+                              <div className="text-[9px] font-bold text-slate-400">
+                                +{dayEvents.length - 2}개
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {/* Upcoming events list */}
-                {(() => {
-                  const upcoming = calendarEvents
-                    .filter((e) => e.date >= Date.now())
-                    .slice(0, 5);
-                  if (upcoming.length === 0) return null;
-                  return (
-                    <div className="mt-8">
-                      <p className="mb-4 text-[10px] font-black uppercase tracking-widest text-slate-300">
-                        다가오는 일정
-                      </p>
+                {/* Right — upcoming events */}
+                <div className="w-full shrink-0 rounded-[2.5rem] border border-slate-100 bg-white p-8 shadow-sm lg:w-72">
+                  <div className="mb-6 flex items-center gap-3">
+                    <CalendarDays className="h-5 w-5 text-blue-500" />
+                    <h4 className="font-black text-slate-800">다가오는 일정</h4>
+                  </div>
+                  {(() => {
+                    const upcoming = calendarEvents
+                      .filter((e) => e.date >= Date.now())
+                      .sort((a, b) => a.date - b.date)
+                      .slice(0, 8);
+                    if (upcoming.length === 0) {
+                      return (
+                        <div className="flex flex-col items-center justify-center py-10 text-center">
+                          <p className="text-3xl">📭</p>
+                          <p className="mt-3 text-sm font-medium text-slate-300">예정된 일정이 없어요</p>
+                        </div>
+                      );
+                    }
+                    return (
                       <div className="space-y-3">
-                        {upcoming.map((event) => (
-                          <div
-                            key={event.id}
-                            className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4"
-                          >
-                            <span className="text-xl">{event.emoji}</span>
-                            <div>
-                              <p className="text-sm font-bold text-slate-800">{event.title}</p>
-                              <p className="text-[10px] font-medium text-slate-400">
-                                {new Date(event.date).toLocaleDateString("ko-KR", {
-                                  year: "numeric",
-                                  month: "long",
-                                  day: "numeric",
-                                })}
-                              </p>
+                        {upcoming.map((event) => {
+                          const d = new Date(event.date);
+                          const diffDays = Math.ceil((d.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                          return (
+                            <div
+                              key={event.id}
+                              className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3"
+                            >
+                              <span className="mt-0.5 text-lg leading-none">{event.emoji}</span>
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-bold text-slate-800">{event.title}</p>
+                                <p className="mt-0.5 text-[10px] font-medium text-slate-400">
+                                  {d.toLocaleDateString("ko-KR", { month: "long", day: "numeric" })}
+                                </p>
+                              </div>
+                              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black ${
+                                diffDays === 0
+                                  ? "bg-red-100 text-red-500"
+                                  : diffDays <= 3
+                                    ? "bg-orange-100 text-orange-500"
+                                    : "bg-slate-100 text-slate-400"
+                              }`}>
+                                {diffDays === 0 ? "오늘" : `D-${diffDays}`}
+                              </span>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
-                    </div>
-                  );
-                })()}
+                    );
+                  })()}
+                </div>
+
               </section>
             )}
           </div>

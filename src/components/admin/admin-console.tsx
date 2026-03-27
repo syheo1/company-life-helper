@@ -12,6 +12,7 @@ import {
   Bell,
   MapPin,
   Megaphone,
+  Pencil,
   Pin,
   PinOff,
   Plus,
@@ -191,14 +192,24 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
   // Action state
   const [busyKey, setBusyKey] = useState("");
 
+  // Team form
+  const [showTeamForm, setShowTeamForm] = useState(false);
+  const [teamForm, setTeamForm] = useState({
+    teamId: "",
+    name: "",
+    features: [] as Feature[],
+  });
+
   // Notice form
   const [showNoticeForm, setShowNoticeForm] = useState(false);
-  const [noticeForm, setNoticeForm] = useState({ title: "", content: "", isPinned: false });
+  const [editingNotice, setEditingNotice] = useState<Notice | null>(null);
+  const [noticeForm, setNoticeForm] = useState({ title: "", content: "", isPinned: false, targetTeamId: teamId });
   const [noticeImageFile, setNoticeImageFile] = useState<File | null>(null);
   const [noticeImagePreview, setNoticeImagePreview] = useState("");
 
   // Restaurant form
   const [showRestaurantForm, setShowRestaurantForm] = useState(false);
+  const [editingRestaurant, setEditingRestaurant] = useState<Restaurant | null>(null);
   const [restaurantForm, setRestaurantForm] = useState({
     name: "",
     category: "한식",
@@ -206,21 +217,27 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
     walkMinutes: "5",
     workLocationIds: [] as string[],
     address: "",
+    externalUrl: "",
+    recommendedMenus: "",
+    notes: "",
   });
   const [restaurantGeoSearching, setRestaurantGeoSearching] = useState(false);
   const [restaurantPreviewCoords, setRestaurantPreviewCoords] = useState<{ lat: number; lon: number } | null>(null);
 
   // Poll form
   const [showPollForm, setShowPollForm] = useState(false);
+  const [editingPoll, setEditingPoll] = useState<Poll | null>(null);
   const [pollForm, setPollForm] = useState({
     title: "",
     options: ["", ""],
     endsAt: "",
+    targetTeamId: teamId,
   });
 
   // Calendar event form
   const [showEventForm, setShowEventForm] = useState(false);
-  const [eventForm, setEventForm] = useState({ title: "", emoji: "📅", date: "" });
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const [eventForm, setEventForm] = useState({ title: "", emoji: "📅", date: "", targetTeamId: teamId });
 
   // Member management
   const [memberFilter, setMemberFilter] = useState<"all" | "pending" | "approved" | "locked">("all");
@@ -278,8 +295,9 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
     setIsContentLoading(true);
     try {
       const { db } = getFirebaseClient();
+      const teamIds = teamId === "common" ? ["common"] : [teamId, "common"];
       const snap = await getDocs(
-        query(collection(db, "notices"), where("teamId", "==", teamId)),
+        query(collection(db, "notices"), where("teamId", "in", teamIds)),
       );
       const list = snap.docs.map((d) => d.data() as Notice);
       list.sort((a, b) => {
@@ -318,8 +336,9 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
     setIsContentLoading(true);
     try {
       const { db } = getFirebaseClient();
+      const teamIds = teamId === "common" ? ["common"] : [teamId, "common"];
       const snap = await getDocs(
-        query(collection(db, "polls"), where("teamId", "==", teamId)),
+        query(collection(db, "polls"), where("teamId", "in", teamIds)),
       );
       const list = snap.docs.map((d) => d.data() as Poll);
       list.sort((a, b) => b.createdAt - a.createdAt);
@@ -336,8 +355,9 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
     setIsContentLoading(true);
     try {
       const { db } = getFirebaseClient();
+      const teamIds = teamId === "common" ? ["common"] : [teamId, "common"];
       const snap = await getDocs(
-        query(collection(db, "calendarEvents"), where("teamId", "==", teamId)),
+        query(collection(db, "calendarEvents"), where("teamId", "in", teamIds)),
       );
       const list = snap.docs.map((d) => d.data() as CalendarEvent);
       list.sort((a, b) => a.date - b.date);
@@ -535,6 +555,53 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
     }
   }
 
+  async function createTeam() {
+    const normalizedId = teamForm.teamId.trim().toLowerCase().replace(/\s+/g, "-");
+    if (!normalizedId || !teamForm.name.trim()) {
+      toast.error("팀 ID와 팀 이름을 입력해주세요.");
+      return;
+    }
+    if (!/^[a-z0-9-]{2,30}$/.test(normalizedId)) {
+      toast.error("팀 ID는 영문 소문자, 숫자, 하이픈만 사용해 2~30자로 입력해주세요.");
+      return;
+    }
+    if (teams.some((t) => t.id === normalizedId)) {
+      toast.error("이미 존재하는 팀 ID입니다.");
+      return;
+    }
+    setBusyKey("team-create");
+    try {
+      const { db } = getFirebaseClient();
+      await setDoc(doc(db, "teams", normalizedId), {
+        name: teamForm.name.trim(),
+        features: teamForm.features,
+        createdAt: Date.now(),
+      });
+      setTeamForm({ teamId: "", name: "", features: [] });
+      setShowTeamForm(false);
+      await refreshData();
+      toast.success("팀이 생성되었습니다.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "팀 생성에 실패했습니다.");
+    } finally {
+      setBusyKey("");
+    }
+  }
+
+  async function deleteTeam(teamIdValue: string) {
+    setBusyKey(`team-del:${teamIdValue}`);
+    try {
+      const { db } = getFirebaseClient();
+      await deleteDoc(doc(db, "teams", teamIdValue));
+      await refreshData();
+      toast.success("팀이 삭제되었습니다.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "팀 삭제에 실패했습니다.");
+    } finally {
+      setBusyKey("");
+    }
+  }
+
   async function toggleTeamFeature(teamIdValue: string, feature: Feature, enabled: boolean) {
     const taskKey = `team:${teamIdValue}:${feature}`;
     setBusyKey(taskKey);
@@ -577,13 +644,13 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
         id: docRef.id,
         title: noticeForm.title.trim(),
         content: noticeForm.content.trim(),
-        teamId,
+        teamId: noticeForm.targetTeamId,
         isPinned: noticeForm.isPinned,
         ...(imageUrl ? { imageUrl } : {}),
         createdAt: Date.now(),
         updatedAt: Date.now(),
       });
-      setNoticeForm({ title: "", content: "", isPinned: false });
+      setNoticeForm({ title: "", content: "", isPinned: false, targetTeamId: teamId });
       setNoticeImageFile(null);
       setNoticeImagePreview("");
       setShowNoticeForm(false);
@@ -591,6 +658,41 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
       toast.success("공지사항이 등록되었습니다.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "공지사항 등록에 실패했습니다.");
+    } finally {
+      setBusyKey("");
+    }
+  }
+
+  async function updateNotice() {
+    if (!editingNotice) return;
+    if (!noticeForm.title.trim() || !noticeForm.content.trim()) {
+      toast.error("제목과 내용을 모두 입력해주세요.");
+      return;
+    }
+    setBusyKey("notice-update");
+    try {
+      const { db } = getFirebaseClient();
+      let imageUrl: string | undefined = editingNotice.imageUrl;
+      if (noticeImageFile) {
+        imageUrl = await uploadImageToCloudinary(noticeImageFile);
+      }
+      await updateDoc(doc(db, "notices", editingNotice.id), {
+        title: noticeForm.title.trim(),
+        content: noticeForm.content.trim(),
+        teamId: noticeForm.targetTeamId,
+        isPinned: noticeForm.isPinned,
+        imageUrl: imageUrl ?? null,
+        updatedAt: Date.now(),
+      });
+      setNoticeForm({ title: "", content: "", isPinned: false, targetTeamId: teamId });
+      setNoticeImageFile(null);
+      setNoticeImagePreview("");
+      setEditingNotice(null);
+      setShowNoticeForm(false);
+      await loadNotices();
+      toast.success("공지사항이 수정되었습니다.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "공지사항 수정에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -633,6 +735,10 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
       toast.error("식당 이름을 입력해주세요.");
       return;
     }
+    if (!restaurantForm.externalUrl.trim()) {
+      toast.error("네이버 리뷰 또는 네이버 지도 링크를 입력해주세요.");
+      return;
+    }
     const rating = parseFloat(restaurantForm.rating);
     const walkMinutes = parseInt(restaurantForm.walkMinutes, 10);
     if (isNaN(rating) || rating < 0 || rating > 5) {
@@ -657,16 +763,70 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
         teamId,
         workLocationIds: restaurantForm.workLocationIds,
         address: restaurantForm.address.trim() || "",
+        externalUrl: restaurantForm.externalUrl.trim(),
+        ...(restaurantForm.recommendedMenus.trim() ? { recommendedMenus: restaurantForm.recommendedMenus.trim() } : {}),
+        ...(restaurantForm.notes.trim() ? { notes: restaurantForm.notes.trim() } : {}),
         ...(restaurantPreviewCoords ? { lat: restaurantPreviewCoords.lat, lon: restaurantPreviewCoords.lon } : {}),
         createdAt: Date.now(),
       });
-      setRestaurantForm({ name: "", category: "한식", rating: "4.5", walkMinutes: "5", workLocationIds: [], address: "" });
+      setRestaurantForm({ name: "", category: "한식", rating: "4.5", walkMinutes: "5", workLocationIds: [], address: "", externalUrl: "", recommendedMenus: "", notes: "" });
       setRestaurantPreviewCoords(null);
       setShowRestaurantForm(false);
       await loadRestaurants();
       toast.success("맛집이 등록되었습니다.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "맛집 등록에 실패했습니다.");
+    } finally {
+      setBusyKey("");
+    }
+  }
+
+  async function updateRestaurant() {
+    if (!editingRestaurant) return;
+    if (!restaurantForm.name.trim()) {
+      toast.error("식당 이름을 입력해주세요.");
+      return;
+    }
+    if (!restaurantForm.externalUrl.trim()) {
+      toast.error("네이버 리뷰 또는 네이버 지도 링크를 입력해주세요.");
+      return;
+    }
+    const rating = parseFloat(restaurantForm.rating);
+    const walkMinutes = parseInt(restaurantForm.walkMinutes, 10);
+    if (isNaN(rating) || rating < 0 || rating > 5) {
+      toast.error("평점은 0~5 사이로 입력해주세요.");
+      return;
+    }
+    if (isNaN(walkMinutes) || walkMinutes < 1) {
+      toast.error("도보 시간을 1분 이상으로 입력해주세요.");
+      return;
+    }
+    setBusyKey("restaurant-update");
+    try {
+      const { db } = getFirebaseClient();
+      const coords = restaurantPreviewCoords
+        ? { lat: restaurantPreviewCoords.lat, lon: restaurantPreviewCoords.lon }
+        : { lat: editingRestaurant.lat ?? null, lon: editingRestaurant.lon ?? null };
+      await updateDoc(doc(db, "restaurants", editingRestaurant.id), {
+        name: restaurantForm.name.trim(),
+        category: restaurantForm.category,
+        rating,
+        walkMinutes,
+        workLocationIds: restaurantForm.workLocationIds,
+        address: restaurantForm.address.trim() || "",
+        externalUrl: restaurantForm.externalUrl.trim(),
+        recommendedMenus: restaurantForm.recommendedMenus.trim() || null,
+        notes: restaurantForm.notes.trim() || null,
+        ...( (coords.lat != null && coords.lon != null) ? { lat: coords.lat, lon: coords.lon } : {}),
+      });
+      setRestaurantForm({ name: "", category: "한식", rating: "4.5", walkMinutes: "5", workLocationIds: [], address: "", externalUrl: "", recommendedMenus: "", notes: "" });
+      setRestaurantPreviewCoords(null);
+      setEditingRestaurant(null);
+      setShowRestaurantForm(false);
+      await loadRestaurants();
+      toast.success("맛집 정보가 수정되었습니다.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "맛집 수정에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -716,19 +876,59 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
       await setDoc(docRef, {
         id: docRef.id,
         title: pollForm.title.trim(),
-        teamId,
+        teamId: pollForm.targetTeamId,
         status: "active",
         options,
         totalVotes: 0,
         createdAt: Date.now(),
         endsAt: new Date(pollForm.endsAt).getTime(),
       });
-      setPollForm({ title: "", options: ["", ""], endsAt: "" });
+      setPollForm({ title: "", options: ["", ""], endsAt: "", targetTeamId: teamId });
       setShowPollForm(false);
       await loadPolls();
       toast.success("투표가 생성되었습니다.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "투표 생성에 실패했습니다.");
+    } finally {
+      setBusyKey("");
+    }
+  }
+
+  async function updatePoll() {
+    if (!editingPoll) return;
+    const validOptions = pollForm.options.filter((o) => o.trim() !== "");
+    if (!pollForm.title.trim()) {
+      toast.error("투표 제목을 입력해주세요.");
+      return;
+    }
+    if (validOptions.length < 2) {
+      toast.error("선택지는 최소 2개 이상 입력해주세요.");
+      return;
+    }
+    if (!pollForm.endsAt) {
+      toast.error("마감일을 설정해주세요.");
+      return;
+    }
+    setBusyKey("poll-update");
+    try {
+      const { db } = getFirebaseClient();
+      const options: PollOption[] = validOptions.map((label, i) => {
+        const existing = editingPoll.options.find((o) => o.label === label);
+        return existing ?? { id: `opt_${i}`, label: label.trim(), votes: 0 };
+      });
+      await updateDoc(doc(db, "polls", editingPoll.id), {
+        title: pollForm.title.trim(),
+        teamId: pollForm.targetTeamId,
+        options,
+        endsAt: new Date(pollForm.endsAt).getTime(),
+      });
+      setPollForm({ title: "", options: ["", ""], endsAt: "", targetTeamId: teamId });
+      setEditingPoll(null);
+      setShowPollForm(false);
+      await loadPolls();
+      toast.success("투표가 수정되었습니다.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "투표 수정에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -785,15 +985,46 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
         title: eventForm.title.trim(),
         emoji: eventForm.emoji,
         date: new Date(eventForm.date).getTime(),
-        teamId,
+        teamId: eventForm.targetTeamId,
         createdAt: Date.now(),
       });
-      setEventForm({ title: "", emoji: "📅", date: "" });
+      setEventForm({ title: "", emoji: "📅", date: "", targetTeamId: teamId });
       setShowEventForm(false);
       await loadCalendarEvents();
       toast.success("일정이 등록되었습니다.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "일정 등록에 실패했습니다.");
+    } finally {
+      setBusyKey("");
+    }
+  }
+
+  async function updateCalendarEvent() {
+    if (!editingEvent) return;
+    if (!eventForm.title.trim()) {
+      toast.error("일정 제목을 입력해주세요.");
+      return;
+    }
+    if (!eventForm.date) {
+      toast.error("날짜를 선택해주세요.");
+      return;
+    }
+    setBusyKey("event-update");
+    try {
+      const { db } = getFirebaseClient();
+      await updateDoc(doc(db, "calendarEvents", editingEvent.id), {
+        title: eventForm.title.trim(),
+        emoji: eventForm.emoji,
+        date: new Date(eventForm.date).getTime(),
+        teamId: eventForm.targetTeamId,
+      });
+      setEventForm({ title: "", emoji: "📅", date: "", targetTeamId: teamId });
+      setEditingEvent(null);
+      setShowEventForm(false);
+      await loadCalendarEvents();
+      toast.success("일정이 수정되었습니다.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "일정 수정에 실패했습니다.");
     } finally {
       setBusyKey("");
     }
@@ -1298,9 +1529,89 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
   }
 
   function renderTeams() {
+    const normalizedNewTeamId = teamForm.teamId.trim().toLowerCase().replace(/\s+/g, "-");
     return (
       <div className="max-w-6xl space-y-8">
-        <h3 className="text-2xl font-black">팀별 기능 활성화 설정</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-2xl font-black">팀별 기능 활성화 설정</h3>
+          <button
+            onClick={() => setShowTeamForm((v) => !v)}
+            className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm"
+          >
+            {showTeamForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {showTeamForm ? "취소" : "팀 추가"}
+          </button>
+        </div>
+
+        {showTeamForm && (
+          <div className="rounded-[2rem] border border-indigo-100 bg-indigo-50 p-8 space-y-5">
+            <h4 className="font-bold text-indigo-700">새 팀 추가</h4>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500">팀 ID</label>
+                <input
+                  type="text"
+                  placeholder="webapp-team"
+                  value={teamForm.teamId}
+                  onChange={(e) => setTeamForm((f) => ({ ...f, teamId: e.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400"
+                />
+                <p className="text-[11px] text-slate-400">
+                  실제 ID: <span className="font-bold">{normalizedNewTeamId || "-"}</span>
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500">팀 이름</label>
+                <input
+                  type="text"
+                  placeholder="디아이웨어"
+                  value={teamForm.name}
+                  onChange={(e) => setTeamForm((f) => ({ ...f, name: e.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-slate-500">활성화할 기능 선택</p>
+              <div className="flex flex-wrap gap-2">
+                {(Object.keys(FEATURE_LABELS) as Feature[]).map((feature) => {
+                  const selected = teamForm.features.includes(feature);
+                  return (
+                    <button
+                      key={feature}
+                      type="button"
+                      onClick={() =>
+                        setTeamForm((f) => ({
+                          ...f,
+                          features: selected
+                            ? f.features.filter((x) => x !== feature)
+                            : [...f.features, feature],
+                        }))
+                      }
+                      className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition ${
+                        selected
+                          ? "border-indigo-500 bg-indigo-100 text-indigo-600"
+                          : "border-gray-200 bg-white text-slate-500 hover:border-indigo-300"
+                      }`}
+                    >
+                      <Check className={`h-3 w-3 ${selected ? "opacity-100" : "opacity-0"}`} />
+                      {FEATURE_LABELS[feature]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <button
+              onClick={() => startTransition(() => void createTeam())}
+              disabled={busyKey === "team-create"}
+              className="flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white disabled:opacity-50"
+            >
+              {busyKey === "team-create" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              팀 생성
+            </button>
+          </div>
+        )}
+
         <div className="grid gap-6">
           {teams.map((team) => (
             <div
@@ -1319,6 +1630,20 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
                     </p>
                   </div>
                 </div>
+                <button
+                  onClick={() => {
+                    if (!confirm(`"${team.name}" 팀을 삭제할까요? 이 작업은 되돌릴 수 없습니다.`)) return;
+                    startTransition(() => void deleteTeam(team.id));
+                  }}
+                  disabled={busyKey !== ""}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-slate-300 transition hover:bg-red-50 hover:text-red-500 disabled:opacity-40"
+                >
+                  {busyKey === `team-del:${team.id}` ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                </button>
               </div>
               <p className="mb-6 text-[10px] font-black uppercase tracking-widest text-slate-300">
                 팀 기능 활성화 설정
@@ -1368,8 +1693,15 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
           <h3 className="text-2xl font-black">공지사항 관리</h3>
           <button
             onClick={() => {
-              setShowNoticeForm((v) => !v);
-          
+              if (showNoticeForm) {
+                setShowNoticeForm(false);
+                setEditingNotice(null);
+                setNoticeForm({ title: "", content: "", isPinned: false, targetTeamId: teamId });
+                setNoticeImageFile(null);
+                setNoticeImagePreview("");
+              } else {
+                setShowNoticeForm(true);
+              }
             }}
             className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm"
           >
@@ -1380,7 +1712,21 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
 
         {showNoticeForm && (
           <div className="rounded-[2rem] border border-indigo-100 bg-indigo-50 p-8 space-y-4">
-            <h4 className="font-bold text-indigo-700">새 공지사항</h4>
+            <h4 className="font-bold text-indigo-700">{editingNotice ? "공지사항 수정" : "새 공지사항"}</h4>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-500">대상 팀</label>
+              <select
+                value={noticeForm.targetTeamId}
+                onChange={(e) => setNoticeForm((f) => ({ ...f, targetTeamId: e.target.value }))}
+                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400"
+              >
+                <option value={teamId}>{teams.find((t) => t.id === teamId)?.name ?? teamId} (내 팀)</option>
+                <option value="common">전체 공통</option>
+                {role === "super_admin" && teams.filter((t) => t.id !== teamId).map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
             <input
               type="text"
               placeholder="제목"
@@ -1439,14 +1785,14 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
               상단 고정
             </label>
             <button
-              onClick={() => startTransition(() => void addNotice())}
-              disabled={busyKey === "notice-add"}
+              onClick={() => startTransition(() => editingNotice ? void updateNotice() : void addNotice())}
+              disabled={busyKey === "notice-add" || busyKey === "notice-update"}
               className="flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white disabled:opacity-50"
             >
-              {busyKey === "notice-add" ? (
+              {(busyKey === "notice-add" || busyKey === "notice-update") ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : null}
-              저장하기
+              {editingNotice ? "수정 완료" : "저장하기"}
             </button>
           </div>
         )}
@@ -1464,12 +1810,19 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <div className="mb-2 flex items-center gap-2">
+                    <div className="mb-2 flex items-center gap-2 flex-wrap">
                       {notice.isPinned && (
                         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-600">
                           📌 고정
                         </span>
                       )}
+                      {notice.teamId === "common" ? (
+                        <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-600">전체 공통</span>
+                      ) : notice.teamId !== teamId ? (
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-600">
+                          {teams.find((t) => t.id === notice.teamId)?.name ?? notice.teamId}
+                        </span>
+                      ) : null}
                       <h4 className="font-bold text-slate-900">{notice.title}</h4>
                     </div>
                     <p className="text-sm text-slate-500 line-clamp-2">{notice.content}</p>
@@ -1485,6 +1838,26 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
                     </p>
                   </div>
                   <div className="flex shrink-0 gap-2">
+                    <button
+                      onClick={() => {
+                        setEditingNotice(notice);
+                        setNoticeForm({
+                          title: notice.title,
+                          content: notice.content,
+                          isPinned: notice.isPinned,
+                          targetTeamId: notice.teamId,
+                        });
+                        setNoticeImageFile(null);
+                        setNoticeImagePreview(notice.imageUrl ?? "");
+                        setShowNoticeForm(true);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      disabled={busyKey !== ""}
+                      title="수정"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-slate-400 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-500"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
                     <button
                       onClick={() =>
                         startTransition(() => void toggleNoticePin(notice.id, notice.isPinned))
@@ -1534,8 +1907,14 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
           <h3 className="text-2xl font-black">맛집 데이터 관리</h3>
           <button
             onClick={() => {
-              setShowRestaurantForm((v) => !v);
-          
+              if (showRestaurantForm) {
+                setShowRestaurantForm(false);
+                setEditingRestaurant(null);
+                setRestaurantForm({ name: "", category: "한식", rating: "4.5", walkMinutes: "5", workLocationIds: [], address: "", externalUrl: "", recommendedMenus: "", notes: "" });
+                setRestaurantPreviewCoords(null);
+              } else {
+                setShowRestaurantForm(true);
+              }
             }}
             className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm"
           >
@@ -1546,7 +1925,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
 
         {showRestaurantForm && (
           <div className="rounded-[2rem] border border-indigo-100 bg-indigo-50 p-8 space-y-5">
-            <h4 className="font-bold text-indigo-700">새 맛집 등록</h4>
+            <h4 className="font-bold text-indigo-700">{editingRestaurant ? "맛집 정보 수정" : "새 맛집 등록"}</h4>
 
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
               {/* 식당 이름 */}
@@ -1691,13 +2070,49 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
               )}
             </div>
 
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-500">
+                외부 링크 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="url"
+                placeholder="https://naver.me/... (네이버 리뷰 또는 네이버 지도)"
+                value={restaurantForm.externalUrl}
+                onChange={(e) => setRestaurantForm((f) => ({ ...f, externalUrl: e.target.value }))}
+                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400"
+              />
+              <p className="text-[11px] text-slate-400">네이버 리뷰 또는 네이버 지도 링크를 입력해주세요.</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-500">추천 메뉴 <span className="text-slate-300">(선택)</span></label>
+              <input
+                type="text"
+                placeholder="예: 김치찌개, 된장찌개"
+                value={restaurantForm.recommendedMenus}
+                onChange={(e) => setRestaurantForm((f) => ({ ...f, recommendedMenus: e.target.value }))}
+                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-500">특이사항 <span className="text-slate-300">(선택)</span></label>
+              <textarea
+                placeholder="예: 웨이팅 있음, 현금만 가능, 주차 불가"
+                value={restaurantForm.notes}
+                onChange={(e) => setRestaurantForm((f) => ({ ...f, notes: e.target.value }))}
+                rows={2}
+                className="w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400"
+              />
+            </div>
+
             <button
-              onClick={() => startTransition(() => void addRestaurant())}
-              disabled={busyKey === "restaurant-add"}
+              onClick={() => startTransition(() => editingRestaurant ? void updateRestaurant() : void addRestaurant())}
+              disabled={busyKey === "restaurant-add" || busyKey === "restaurant-update"}
               className="flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white disabled:opacity-50"
             >
-              {busyKey === "restaurant-add" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              저장하기
+              {(busyKey === "restaurant-add" || busyKey === "restaurant-update") ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {editingRestaurant ? "수정 완료" : "저장하기"}
             </button>
           </div>
         )}
@@ -1713,14 +2128,36 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
                 key={r.id}
                 className="flex items-center justify-between rounded-[2rem] border border-gray-100 bg-white p-6 shadow-sm"
               >
-                <div>
-                  <p className="font-bold text-slate-900">{r.name}</p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-slate-900">{r.name}</p>
+                    {r.externalUrl && (
+                      <a
+                        href={r.externalUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 rounded-lg bg-green-50 px-2 py-0.5 text-[10px] font-bold text-green-600 hover:bg-green-100"
+                      >
+                        네이버 ↗
+                      </a>
+                    )}
+                  </div>
                   <p className="mt-1 text-xs font-medium text-slate-400">
                     {r.category} · ⭐ {r.rating} · 도보 {r.walkMinutes}분
                   </p>
                   {r.address && (
                     <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-400">
                       <MapPin className="h-2.5 w-2.5 shrink-0" />{r.address}
+                    </p>
+                  )}
+                  {r.recommendedMenus && (
+                    <p className="mt-0.5 text-[11px] text-slate-500">
+                      🍽 {r.recommendedMenus}
+                    </p>
+                  )}
+                  {r.notes && (
+                    <p className="mt-0.5 text-[11px] text-slate-400 italic">
+                      💬 {r.notes}
                     </p>
                   )}
                   {r.workLocationIds && r.workLocationIds.length > 0 && (
@@ -1734,17 +2171,44 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
                     </div>
                   )}
                 </div>
-                <button
-                  onClick={() => startTransition(() => void deleteRestaurant(r.id))}
-                  disabled={busyKey !== ""}
-                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-slate-300 transition hover:bg-red-50 hover:text-red-500"
-                >
-                  {busyKey === `restaurant-del:${r.id}` ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4" />
-                  )}
-                </button>
+                <div className="flex shrink-0 flex-col gap-2">
+                  <button
+                    onClick={() => {
+                      setEditingRestaurant(r);
+                      setRestaurantForm({
+                        name: r.name,
+                        category: r.category,
+                        rating: String(r.rating),
+                        walkMinutes: String(r.walkMinutes),
+                        workLocationIds: r.workLocationIds ?? [],
+                        address: r.address ?? "",
+                        externalUrl: r.externalUrl ?? "",
+                        recommendedMenus: r.recommendedMenus ?? "",
+                        notes: r.notes ?? "",
+                      });
+                      setRestaurantPreviewCoords(
+                        r.lat != null && r.lon != null ? { lat: r.lat, lon: r.lon } : null,
+                      );
+                      setShowRestaurantForm(true);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                    disabled={busyKey !== ""}
+                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-slate-400 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-500"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => startTransition(() => void deleteRestaurant(r.id))}
+                    disabled={busyKey !== ""}
+                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-slate-300 transition hover:bg-red-50 hover:text-red-500"
+                  >
+                    {busyKey === `restaurant-del:${r.id}` ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
             ))}
             {restaurants.length === 0 && !isContentLoading && (
@@ -1765,8 +2229,13 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
           <h3 className="text-2xl font-black">투표 관리</h3>
           <button
             onClick={() => {
-              setShowPollForm((v) => !v);
-          
+              if (showPollForm) {
+                setShowPollForm(false);
+                setEditingPoll(null);
+                setPollForm({ title: "", options: ["", ""], endsAt: "", targetTeamId: teamId });
+              } else {
+                setShowPollForm(true);
+              }
             }}
             className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm"
           >
@@ -1777,7 +2246,21 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
 
         {showPollForm && (
           <div className="rounded-[2rem] border border-indigo-100 bg-indigo-50 p-8 space-y-4">
-            <h4 className="font-bold text-indigo-700">새 투표</h4>
+            <h4 className="font-bold text-indigo-700">{editingPoll ? "투표 수정" : "새 투표"}</h4>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-500">대상 팀</label>
+              <select
+                value={pollForm.targetTeamId}
+                onChange={(e) => setPollForm((f) => ({ ...f, targetTeamId: e.target.value }))}
+                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400"
+              >
+                <option value={teamId}>{teams.find((t) => t.id === teamId)?.name ?? teamId} (내 팀)</option>
+                <option value="common">전체 공통</option>
+                {role === "super_admin" && teams.filter((t) => t.id !== teamId).map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
             <input
               type="text"
               placeholder="투표 제목"
@@ -1838,12 +2321,12 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
               />
             </div>
             <button
-              onClick={() => startTransition(() => void addPoll())}
-              disabled={busyKey === "poll-add"}
+              onClick={() => startTransition(() => editingPoll ? void updatePoll() : void addPoll())}
+              disabled={busyKey === "poll-add" || busyKey === "poll-update"}
               className="flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white disabled:opacity-50"
             >
-              {busyKey === "poll-add" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              투표 생성
+              {(busyKey === "poll-add" || busyKey === "poll-update") ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {editingPoll ? "수정 완료" : "투표 생성"}
             </button>
           </div>
         )}
@@ -1861,7 +2344,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
               >
                 <div className="mb-4 flex items-start justify-between gap-4">
                   <div>
-                    <div className="mb-2 flex items-center gap-2">
+                    <div className="mb-2 flex items-center gap-2 flex-wrap">
                       <span
                         className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                           poll.status === "active"
@@ -1871,6 +2354,13 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
                       >
                         {poll.status === "active" ? "진행 중" : "종료됨"}
                       </span>
+                      {poll.teamId === "common" ? (
+                        <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-600">전체 공통</span>
+                      ) : poll.teamId !== teamId ? (
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-600">
+                          {teams.find((t) => t.id === poll.teamId)?.name ?? poll.teamId}
+                        </span>
+                      ) : null}
                       <span className="text-[10px] font-medium text-slate-400">
                         마감: {formatDate(poll.endsAt)}
                       </span>
@@ -1879,6 +2369,27 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
                     <p className="mt-1 text-xs text-slate-400">총 {poll.totalVotes}명 참여</p>
                   </div>
                   <div className="flex shrink-0 gap-2">
+                    <button
+                      onClick={() => {
+                        const endsAtDate = new Date(poll.endsAt);
+                        const pad = (n: number) => String(n).padStart(2, "0");
+                        const endsAtStr = `${endsAtDate.getFullYear()}-${pad(endsAtDate.getMonth() + 1)}-${pad(endsAtDate.getDate())}T${pad(endsAtDate.getHours())}:${pad(endsAtDate.getMinutes())}`;
+                        setEditingPoll(poll);
+                        setPollForm({
+                          title: poll.title,
+                          options: poll.options.map((o) => o.label),
+                          endsAt: endsAtStr,
+                          targetTeamId: poll.teamId,
+                        });
+                        setShowPollForm(true);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      disabled={busyKey !== ""}
+                      title="수정"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-slate-400 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-500"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
                     {poll.status === "active" && (
                       <button
                         onClick={() => startTransition(() => void endPoll(poll.id))}
@@ -1943,8 +2454,13 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
           <h3 className="text-2xl font-black">팀 일정 관리</h3>
           <button
             onClick={() => {
-              setShowEventForm((v) => !v);
-          
+              if (showEventForm) {
+                setShowEventForm(false);
+                setEditingEvent(null);
+                setEventForm({ title: "", emoji: "📅", date: "", targetTeamId: teamId });
+              } else {
+                setShowEventForm(true);
+              }
             }}
             className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm"
           >
@@ -1955,7 +2471,21 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
 
         {showEventForm && (
           <div className="rounded-[2rem] border border-indigo-100 bg-indigo-50 p-8 space-y-4">
-            <h4 className="font-bold text-indigo-700">새 일정</h4>
+            <h4 className="font-bold text-indigo-700">{editingEvent ? "일정 수정" : "새 일정"}</h4>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-500">대상 팀</label>
+              <select
+                value={eventForm.targetTeamId}
+                onChange={(e) => setEventForm((f) => ({ ...f, targetTeamId: e.target.value }))}
+                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400"
+              >
+                <option value={teamId}>{teams.find((t) => t.id === teamId)?.name ?? teamId} (내 팀)</option>
+                <option value="common">전체 공통</option>
+                {role === "super_admin" && teams.filter((t) => t.id !== teamId).map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
             <input
               type="text"
               placeholder="일정 제목"
@@ -1988,12 +2518,12 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
               className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-400"
             />
             <button
-              onClick={() => startTransition(() => void addCalendarEvent())}
-              disabled={busyKey === "event-add"}
+              onClick={() => startTransition(() => editingEvent ? void updateCalendarEvent() : void addCalendarEvent())}
+              disabled={busyKey === "event-add" || busyKey === "event-update"}
               className="flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white disabled:opacity-50"
             >
-              {busyKey === "event-add" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              저장하기
+              {(busyKey === "event-add" || busyKey === "event-update") ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {editingEvent ? "수정 완료" : "저장하기"}
             </button>
           </div>
         )}
@@ -2014,23 +2544,50 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
                     {event.emoji}
                   </div>
                   <div>
-                    <p className="font-bold text-slate-900">{event.title}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-bold text-slate-900">{event.title}</p>
+                      {event.teamId === "common" ? (
+                        <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-600">전체 공통</span>
+                      ) : event.teamId !== teamId ? (
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-600">
+                          {teams.find((t) => t.id === event.teamId)?.name ?? event.teamId}
+                        </span>
+                      ) : null}
+                    </div>
                     <p className="text-xs font-medium text-slate-400">
                       {formatDateShort(event.date)}
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={() => startTransition(() => void deleteCalendarEvent(event.id))}
-                  disabled={busyKey !== ""}
-                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-slate-300 transition hover:bg-red-50 hover:text-red-500"
-                >
-                  {busyKey === `event-del:${event.id}` ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4" />
-                  )}
-                </button>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    onClick={() => {
+                      const d = new Date(event.date);
+                      const pad = (n: number) => String(n).padStart(2, "0");
+                      const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+                      setEditingEvent(event);
+                      setEventForm({ title: event.title, emoji: event.emoji, date: dateStr, targetTeamId: event.teamId });
+                      setShowEventForm(true);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                    disabled={busyKey !== ""}
+                    title="수정"
+                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-slate-400 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-500"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => startTransition(() => void deleteCalendarEvent(event.id))}
+                    disabled={busyKey !== ""}
+                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-slate-300 transition hover:bg-red-50 hover:text-red-500"
+                  >
+                    {busyKey === `event-del:${event.id}` ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
             ))}
             {calendarEvents.length === 0 && !isContentLoading && (

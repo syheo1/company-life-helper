@@ -80,6 +80,9 @@ export interface Restaurant {
   address?: string;
   lat?: number;
   lon?: number;
+  externalUrl: string;
+  recommendedMenus?: string;
+  notes?: string;
   createdAt: number;
 }
 
