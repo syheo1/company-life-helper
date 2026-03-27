@@ -129,7 +129,7 @@ export default function FrontLoginPage() {
               <div>
                 <p className="text-base font-black tracking-tight">디아이웨어 라이프 헬퍼</p>
                 <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-blue-100/80">
-                  Diware
+                  Diware Life Helper
                 </p>
               </div>
             </div>
