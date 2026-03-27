@@ -939,7 +939,7 @@ export default function DashboardPage() {
                           />
                         </button>
                         {showLocationDropdown && (
-                          <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl shadow-slate-200/60">
+                          <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl shadow-slate-200/60">
                             {workLocations.map((loc) => (
                               <button
                                 key={loc.id}
