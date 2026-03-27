@@ -2706,7 +2706,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
           <span className="text-2xl font-extrabold tracking-tighter">Admin Console</span>
         </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto">
+        <nav className="admin-lnb-scroll flex-1 space-y-1 overflow-y-scroll">
           <p className="mb-4 px-4 text-[10px] font-bold uppercase tracking-widest text-indigo-400">
             운영 관리
           </p>
