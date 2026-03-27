@@ -7,6 +7,7 @@ import {
   ChartColumn,
   CheckSquare,
   Layers3,
+  Lightbulb,
   Loader2,
   Lock,
   Bell,
@@ -61,6 +62,7 @@ import type {
   Poll,
   PollOption,
   Restaurant,
+  RestaurantSuggestion,
   Team,
   UserStatus,
   WorkLocation,
@@ -80,7 +82,8 @@ type AdminPageKey =
   | "notices"
   | "restaurants"
   | "polls"
-  | "calendar";
+  | "calendar"
+  | "suggestions";
 type AccountKind = "front" | "admin";
 
 type PendingUserRow = {
@@ -142,6 +145,7 @@ const NAV_ITEMS: {
   { key: "restaurants", label: "맛집 데이터 관리", icon: Utensils, group: "content" },
   { key: "polls", label: "투표 관리", icon: CheckSquare, group: "content" },
   { key: "calendar", label: "팀 일정 관리", icon: CalendarDays, group: "content" },
+  { key: "suggestions", label: "식당 추천 관리", icon: Lightbulb, group: "content" },
 ];
 
 const EMOJI_OPTIONS = ["📅", "🎉", "🍻", "🏆", "🎂", "✈️", "💼", "🎯", "🔔", "⭐"];
@@ -186,6 +190,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [polls, setPolls] = useState<Poll[]>([]);
+  const [suggestions, setSuggestions] = useState<RestaurantSuggestion[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [isContentLoading, setIsContentLoading] = useState(false);
 
@@ -286,6 +291,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
     else if (activePage === "restaurants") void loadRestaurants();
     else if (activePage === "polls") void loadPolls();
     else if (activePage === "calendar") void loadCalendarEvents();
+    else if (activePage === "suggestions") void loadSuggestions();
   }, [activePage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Content loaders ---
@@ -366,6 +372,45 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
       toast.error(error instanceof Error ? error.message : "일정을 불러오지 못했습니다.");
     } finally {
       setIsContentLoading(false);
+    }
+  }
+
+  async function loadSuggestions() {
+    setIsContentLoading(true);
+    try {
+      const { db } = getFirebaseClient();
+      const snap = await getDocs(
+        query(collection(db, "restaurantSuggestions"), orderBy("createdAt", "desc")),
+      );
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() } as RestaurantSuggestion));
+      setSuggestions(list);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "추천 목록을 불러오지 못했습니다.");
+    } finally {
+      setIsContentLoading(false);
+    }
+  }
+
+  async function markSuggestionReviewed(id: string) {
+    try {
+      const { db } = getFirebaseClient();
+      await updateDoc(doc(db, "restaurantSuggestions", id), { status: "reviewed" });
+      setSuggestions((prev) => prev.map((s) => s.id === id ? { ...s, status: "reviewed" } : s));
+      toast.success("검토 완료로 변경했습니다.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "상태 변경에 실패했습니다.");
+    }
+  }
+
+  async function deleteSuggestion(id: string) {
+    if (!confirm("추천을 삭제하시겠습니까?")) return;
+    try {
+      const { db } = getFirebaseClient();
+      await deleteDoc(doc(db, "restaurantSuggestions", id));
+      setSuggestions((prev) => prev.filter((s) => s.id !== id));
+      toast.success("삭제됐습니다.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
     }
   }
 
@@ -2686,11 +2731,120 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
             {!isLoading && activePage === "restaurants" ? renderRestaurants() : null}
             {!isLoading && activePage === "polls" ? renderPolls() : null}
             {!isLoading && activePage === "calendar" ? renderCalendarEvents() : null}
+            {!isLoading && activePage === "suggestions" ? renderSuggestions() : null}
           </div>
         </div>
       </section>
     </main>
   );
+
+  function renderSuggestions() {
+    const pending = suggestions.filter((s) => s.status === "pending");
+    const reviewed = suggestions.filter((s) => s.status === "reviewed");
+
+    return (
+      <div className="max-w-4xl space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-2xl font-black">식당 추천 관리</h3>
+            <p className="mt-1 text-sm font-medium text-slate-400">
+              팀원들이 추천한 식당을 검토하고 맛집 목록에 추가해보세요.
+            </p>
+          </div>
+          <button
+            onClick={() => void loadSuggestions()}
+            className="flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
+          >
+            새로고침
+          </button>
+        </div>
+
+        {suggestions.length === 0 ? (
+          <div className="rounded-[2rem] border border-dashed border-slate-200 bg-slate-50 p-12 text-center">
+            <Lightbulb className="mx-auto mb-4 h-10 w-10 text-slate-200" />
+            <p className="text-sm font-medium text-slate-400">아직 추천된 식당이 없습니다.</p>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {/* Pending */}
+            {pending.length > 0 && (
+              <div>
+                <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-orange-400">
+                  검토 대기 ({pending.length})
+                </p>
+                <div className="space-y-3">
+                  {pending.map((s) => (
+                    <div key={s.id} className="flex items-start gap-4 rounded-2xl border border-orange-100 bg-orange-50/40 p-5">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-lg font-black text-slate-900">{s.restaurantName}</span>
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-600">⭐ {s.rating}</span>
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">{s.teamId}</span>
+                        </div>
+                        <p className="mt-2 text-sm text-slate-600">{s.reason}</p>
+                        <p className="mt-2 text-[10px] font-medium text-slate-400">
+                          {s.userName} · {formatDate(s.createdAt)}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-col gap-2">
+                        <button
+                          onClick={() => void markSuggestionReviewed(s.id)}
+                          className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-green-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-green-600"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                          검토 완료
+                        </button>
+                        <button
+                          onClick={() => void deleteSuggestion(s.id)}
+                          className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-500 transition hover:bg-red-50 hover:text-red-500"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          삭제
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Reviewed */}
+            {reviewed.length > 0 && (
+              <div>
+                <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-300">
+                  검토 완료 ({reviewed.length})
+                </p>
+                <div className="space-y-3">
+                  {reviewed.map((s) => (
+                    <div key={s.id} className="flex items-start gap-4 rounded-2xl border border-slate-100 bg-white p-5 opacity-60">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-base font-black text-slate-700">{s.restaurantName}</span>
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-400">⭐ {s.rating}</span>
+                          <span className="rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-bold text-green-500">검토 완료</span>
+                        </div>
+                        <p className="mt-1 text-sm text-slate-500">{s.reason}</p>
+                        <p className="mt-1 text-[10px] font-medium text-slate-400">
+                          {s.userName} · {formatDate(s.createdAt)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => void deleteSuggestion(s.id)}
+                        className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-400 transition hover:bg-red-50 hover:text-red-500"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        삭제
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
 }
 
 function SidebarButton({

@@ -12,9 +12,12 @@ import {
   Loader2,
   LogOut,
   MapPin,
+  Pencil,
+  Plus,
   RefreshCw,
   Shield,
   Sparkles,
+  Trash2,
   Utensils,
   X,
 } from "lucide-react";
@@ -22,20 +25,24 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import {
+  addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
   onSnapshot,
   query,
   runTransaction,
+  serverTimestamp,
+  updateDoc,
   where,
 } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 
 import { getFirebaseClient } from "@/lib/firebase/config";
 import { clearClientSession, SESSION_COOKIE_KEYS } from "@/lib/session";
-import type { CalendarEvent, Notice, Poll, Restaurant, WorkLocation } from "@/types";
+import type { CalendarEvent, Notice, Poll, Restaurant, RestaurantSuggestion, WorkLocation } from "@/types";
 
 type TabId = "home" | "calendar" | "lunch" | "vote";
 
@@ -141,6 +148,17 @@ export default function DashboardPage() {
 
   // Notice detail modal
   const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
+
+  // Calendar event CRUD
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const [eventForm, setEventForm] = useState({ title: "", emoji: "📅", date: "" });
+  const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
+
+  // Restaurant suggestion
+  const [showSuggestionModal, setShowSuggestionModal] = useState(false);
+  const [suggestionForm, setSuggestionForm] = useState({ restaurantName: "", rating: "4.5", reason: "" });
+  const [isSubmittingSuggestion, setIsSubmittingSuggestion] = useState(false);
 
   // Loading / voting / error
   const [isLoading, setIsLoading] = useState(true);
@@ -475,6 +493,100 @@ export default function DashboardPage() {
         setIsPickingLunch(false);
       }, 480);
     }, elapsed);
+  }
+
+  function openAddEvent(dateStr?: string) {
+    setEditingEvent(null);
+    setEventForm({ title: "", emoji: "📅", date: dateStr ?? "" });
+    setShowEventModal(true);
+  }
+
+  function openEditEvent(event: CalendarEvent) {
+    const d = new Date(event.date);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    setEditingEvent(event);
+    setEventForm({ title: event.title, emoji: event.emoji, date: dateStr });
+    setShowEventModal(true);
+  }
+
+  async function submitEvent() {
+    if (!eventForm.title.trim() || !eventForm.date) return;
+    setIsSubmittingEvent(true);
+    try {
+      const { db } = getFirebaseClient();
+      const dateTs = new Date(eventForm.date).getTime();
+      if (editingEvent) {
+        await updateDoc(doc(db, "calendarEvents", editingEvent.id), {
+          title: eventForm.title.trim(),
+          emoji: eventForm.emoji,
+          date: dateTs,
+        });
+        setCalendarEvents((prev) =>
+          prev.map((e) =>
+            e.id === editingEvent.id
+              ? { ...e, title: eventForm.title.trim(), emoji: eventForm.emoji, date: dateTs }
+              : e,
+          ),
+        );
+      } else {
+        const ref = await addDoc(collection(db, "calendarEvents"), {
+          title: eventForm.title.trim(),
+          emoji: eventForm.emoji,
+          date: dateTs,
+          teamId,
+          createdAt: Date.now(),
+        });
+        setCalendarEvents((prev) => [
+          ...prev,
+          { id: ref.id, title: eventForm.title.trim(), emoji: eventForm.emoji, date: dateTs, teamId, createdAt: Date.now() },
+        ]);
+      }
+      setShowEventModal(false);
+      setEditingEvent(null);
+    } catch (err) {
+      console.error("[submitEvent]", err);
+    } finally {
+      setIsSubmittingEvent(false);
+    }
+  }
+
+  async function deleteEvent(eventId: string) {
+    if (!confirm("일정을 삭제하시겠습니까?")) return;
+    try {
+      const { db } = getFirebaseClient();
+      await deleteDoc(doc(db, "calendarEvents", eventId));
+      setCalendarEvents((prev) => prev.filter((e) => e.id !== eventId));
+    } catch (err) {
+      console.error("[deleteEvent]", err);
+    }
+  }
+
+  async function submitSuggestion() {
+    const name = suggestionForm.restaurantName.trim();
+    const reason = suggestionForm.reason.trim();
+    if (!name || !reason) return;
+    setIsSubmittingSuggestion(true);
+    try {
+      const { db } = getFirebaseClient();
+      const suggestion: Omit<RestaurantSuggestion, "id"> = {
+        restaurantName: name,
+        rating: parseFloat(suggestionForm.rating),
+        reason,
+        teamId,
+        uid,
+        userName,
+        status: "pending",
+        createdAt: Date.now(),
+      };
+      await addDoc(collection(db, "restaurantSuggestions"), { ...suggestion, _ts: serverTimestamp() });
+      setSuggestionForm({ restaurantName: "", rating: "4.5", reason: "" });
+      setShowSuggestionModal(false);
+    } catch (err) {
+      console.error("[submitSuggestion]", err);
+    } finally {
+      setIsSubmittingSuggestion(false);
+    }
   }
 
   async function handleLogout() {
@@ -1013,6 +1125,17 @@ export default function DashboardPage() {
                   </div>
 
                 </div>
+
+                {/* Suggestion button */}
+                <div className="relative mt-8 flex justify-center">
+                  <button
+                    onClick={() => setShowSuggestionModal(true)}
+                    className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-6 py-3 text-sm font-bold text-slate-500 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600"
+                  >
+                    🍽 가고 싶은 식당 추천하기
+                  </button>
+                </div>
+
               </section>
             )}
 
@@ -1129,21 +1252,30 @@ export default function DashboardPage() {
                         중요 일정과 기념일을 한눈에 확인하세요.
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 rounded-2xl bg-slate-50 p-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 rounded-2xl bg-slate-50 p-2">
+                        <button
+                          onClick={prevMonth}
+                          className="cursor-pointer rounded-xl p-2.5 transition-all hover:bg-white hover:shadow-sm"
+                        >
+                          <ChevronLeft className="h-4 w-4 text-slate-400" />
+                        </button>
+                        <span className="px-3 font-bold text-slate-700">
+                          {calYear}년 {MONTH_NAMES[calMonth]}
+                        </span>
+                        <button
+                          onClick={nextMonth}
+                          className="cursor-pointer rounded-xl p-2.5 transition-all hover:bg-white hover:shadow-sm"
+                        >
+                          <ChevronRight className="h-4 w-4 text-slate-400" />
+                        </button>
+                      </div>
                       <button
-                        onClick={prevMonth}
-                        className="cursor-pointer rounded-xl p-2.5 transition-all hover:bg-white hover:shadow-sm"
+                        onClick={() => openAddEvent()}
+                        className="flex cursor-pointer items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-100 transition hover:bg-blue-700"
                       >
-                        <ChevronLeft className="h-4 w-4 text-slate-400" />
-                      </button>
-                      <span className="px-3 font-bold text-slate-700">
-                        {calYear}년 {MONTH_NAMES[calMonth]}
-                      </span>
-                      <button
-                        onClick={nextMonth}
-                        className="cursor-pointer rounded-xl p-2.5 transition-all hover:bg-white hover:shadow-sm"
-                      >
-                        <ChevronRight className="h-4 w-4 text-slate-400" />
+                        <Plus className="h-4 w-4" />
+                        일정 추가
                       </button>
                     </div>
                   </div>
@@ -1177,9 +1309,13 @@ export default function DashboardPage() {
                         );
                       });
 
+                      const pad = (n: number) => String(n).padStart(2, "0");
+                      const dateStr = `${calYear}-${pad(calMonth + 1)}-${pad(day)}`;
+
                       return (
                         <div
                           key={day}
+                          onClick={() => openAddEvent(dateStr)}
                           className="group relative min-h-20 cursor-pointer bg-white p-2 transition-colors hover:bg-blue-50/50"
                         >
                           <span
@@ -1197,7 +1333,8 @@ export default function DashboardPage() {
                             {dayEvents.slice(0, 2).map((event) => (
                               <div
                                 key={event.id}
-                                className="truncate rounded-md bg-blue-100 px-1 py-0.5 text-[9px] font-bold text-blue-700"
+                                onClick={(e) => { e.stopPropagation(); openEditEvent(event); }}
+                                className="truncate rounded-md bg-blue-100 px-1 py-0.5 text-[9px] font-bold text-blue-700 hover:bg-blue-200"
                               >
                                 {event.emoji} {event.title}
                               </div>
@@ -1214,8 +1351,58 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* Right — upcoming events */}
-                <div className="w-full shrink-0 rounded-[2.5rem] border border-slate-100 bg-white p-8 shadow-sm lg:w-72">
+                {/* Right — panels */}
+                <div className="flex w-full shrink-0 flex-col gap-6 lg:w-72">
+
+                {/* Today's events */}
+                <div className="rounded-[2.5rem] border border-slate-100 bg-white p-6 shadow-sm">
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-600 text-white">
+                      <CalendarDays className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-slate-800">오늘의 일정</h4>
+                      <p className="text-[10px] font-medium text-slate-400">
+                        {now.toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" })}
+                      </p>
+                    </div>
+                  </div>
+                  {todayEvents.length > 0 ? (
+                    <div className="space-y-2">
+                      {todayEvents.map((event) => (
+                        <div
+                          key={event.id}
+                          className="group flex items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3"
+                        >
+                          <span className="text-lg leading-none">{event.emoji}</span>
+                          <p className="flex-1 truncate text-sm font-bold text-slate-800">{event.title}</p>
+                          <div className="flex gap-1 opacity-0 transition group-hover:opacity-100">
+                            <button
+                              onClick={() => openEditEvent(event)}
+                              className="cursor-pointer rounded-lg p-1 text-blue-300 hover:bg-blue-100 hover:text-blue-600"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                            <button
+                              onClick={() => void deleteEvent(event.id)}
+                              className="cursor-pointer rounded-lg p-1 text-blue-300 hover:bg-red-50 hover:text-red-500"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center py-6 text-center">
+                      <p className="text-2xl">☀️</p>
+                      <p className="mt-2 text-xs font-medium text-slate-300">오늘 등록된 일정이 없어요</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Upcoming events */}
+                <div className="rounded-[2.5rem] border border-slate-100 bg-white p-6 shadow-sm">
                   <div className="mb-6 flex items-center gap-3">
                     <CalendarDays className="h-5 w-5 text-blue-500" />
                     <h4 className="font-black text-slate-800">다가오는 일정</h4>
@@ -1241,7 +1428,7 @@ export default function DashboardPage() {
                           return (
                             <div
                               key={event.id}
-                              className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3"
+                              className="group flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3"
                             >
                               <span className="mt-0.5 text-lg leading-none">{event.emoji}</span>
                               <div className="min-w-0 flex-1">
@@ -1250,15 +1437,29 @@ export default function DashboardPage() {
                                   {d.toLocaleDateString("ko-KR", { month: "long", day: "numeric" })}
                                 </p>
                               </div>
-                              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black ${
-                                diffDays === 0
-                                  ? "bg-red-100 text-red-500"
-                                  : diffDays <= 3
-                                    ? "bg-orange-100 text-orange-500"
-                                    : "bg-slate-100 text-slate-400"
-                              }`}>
-                                {diffDays === 0 ? "오늘" : `D-${diffDays}`}
-                              </span>
+                              <div className="flex shrink-0 items-center gap-1">
+                                <span className={`rounded-full px-2 py-0.5 text-[9px] font-black ${
+                                  diffDays === 0
+                                    ? "bg-red-100 text-red-500"
+                                    : diffDays <= 3
+                                      ? "bg-orange-100 text-orange-500"
+                                      : "bg-slate-100 text-slate-400"
+                                }`}>
+                                  {diffDays === 0 ? "오늘" : `D-${diffDays}`}
+                                </span>
+                                <button
+                                  onClick={() => openEditEvent(event)}
+                                  className="cursor-pointer rounded-lg p-1 text-slate-300 opacity-0 transition hover:bg-blue-50 hover:text-blue-500 group-hover:opacity-100"
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                                <button
+                                  onClick={() => void deleteEvent(event.id)}
+                                  className="cursor-pointer rounded-lg p-1 text-slate-300 opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </div>
                             </div>
                           );
                         })}
@@ -1267,10 +1468,103 @@ export default function DashboardPage() {
                   })()}
                 </div>
 
+                </div>{/* end right panels */}
+
               </section>
             )}
           </div>
         </div>
+
+        {/* Calendar event modal */}
+        {showEventModal && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+            onClick={() => { setShowEventModal(false); setEditingEvent(null); }}
+          >
+            <div
+              className="w-full max-w-md rounded-[2.5rem] bg-white p-8 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-black text-slate-900">
+                    {editingEvent ? "일정 수정" : "일정 추가"} 📅
+                  </h3>
+                  <p className="mt-1 text-xs font-medium text-slate-400">팀 일정을 등록해보세요</p>
+                </div>
+                <button
+                  onClick={() => { setShowEventModal(false); setEditingEvent(null); }}
+                  className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl bg-slate-100 text-slate-500 transition hover:bg-slate-200"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Emoji picker */}
+                <div>
+                  <span className="mb-2 block text-sm font-bold text-slate-700">이모지</span>
+                  <div className="flex flex-wrap gap-2">
+                    {["📅", "🎉", "🍻", "🏆", "🎂", "✈️", "💼", "🎯", "🔔", "⭐", "🎤", "🤝"].map((e) => (
+                      <button
+                        key={e}
+                        onClick={() => setEventForm((f) => ({ ...f, emoji: e }))}
+                        className={`cursor-pointer rounded-xl px-3 py-2 text-lg transition ${
+                          eventForm.emoji === e
+                            ? "bg-blue-100 ring-2 ring-blue-400"
+                            : "bg-slate-50 hover:bg-slate-100"
+                        }`}
+                      >
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-bold text-slate-700">일정 제목 *</span>
+                  <input
+                    type="text"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                    placeholder="일정 이름을 입력하세요"
+                    value={eventForm.title}
+                    onChange={(e) => setEventForm((f) => ({ ...f, title: e.target.value }))}
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-bold text-slate-700">날짜 *</span>
+                  <input
+                    type="date"
+                    className="w-full cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                    value={eventForm.date}
+                    onChange={(e) => setEventForm((f) => ({ ...f, date: e.target.value }))}
+                  />
+                </label>
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                {editingEvent && (
+                  <button
+                    onClick={() => { void deleteEvent(editingEvent.id); setShowEventModal(false); }}
+                    className="flex cursor-pointer items-center gap-2 rounded-2xl border border-red-200 px-5 py-4 text-sm font-bold text-red-500 transition hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    삭제
+                  </button>
+                )}
+                <button
+                  onClick={() => void submitEvent()}
+                  disabled={isSubmittingEvent || !eventForm.title.trim() || !eventForm.date}
+                  className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-blue-600 py-4 text-sm font-black text-white shadow-lg shadow-blue-100 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isSubmittingEvent ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  {isSubmittingEvent ? "저장 중..." : editingEvent ? "수정 완료" : "일정 추가"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Notice detail modal */}
         {selectedNotice && (
@@ -1315,6 +1609,86 @@ export default function DashboardPage() {
                   {selectedNotice.content}
                 </p>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Restaurant suggestion modal */}
+        {showSuggestionModal && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+            onClick={() => setShowSuggestionModal(false)}
+          >
+            <div
+              className="w-full max-w-md rounded-[2.5rem] bg-white p-8 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-black text-slate-900">식당 추천하기 🍽</h3>
+                  <p className="mt-1 text-xs font-medium text-slate-400">관리자가 검토 후 맛집 목록에 추가해드려요</p>
+                </div>
+                <button
+                  onClick={() => setShowSuggestionModal(false)}
+                  className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl bg-slate-100 text-slate-500 transition hover:bg-slate-200"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-bold text-slate-700">식당 이름 *</span>
+                  <input
+                    type="text"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100"
+                    placeholder="추천할 식당 이름을 입력하세요"
+                    value={suggestionForm.restaurantName}
+                    onChange={(e) => setSuggestionForm((f) => ({ ...f, restaurantName: e.target.value }))}
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-bold text-slate-700">평점</span>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min="1"
+                      max="5"
+                      step="0.5"
+                      className="flex-1 cursor-pointer accent-indigo-500"
+                      value={suggestionForm.rating}
+                      onChange={(e) => setSuggestionForm((f) => ({ ...f, rating: e.target.value }))}
+                    />
+                    <span className="w-10 text-center text-lg font-black text-indigo-600">
+                      {suggestionForm.rating}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex justify-between text-[10px] text-slate-300 font-medium">
+                    <span>1.0</span><span>5.0</span>
+                  </div>
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-bold text-slate-700">추천 이유 *</span>
+                  <textarea
+                    rows={3}
+                    className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100"
+                    placeholder="어떤 점이 좋았는지 알려주세요"
+                    value={suggestionForm.reason}
+                    onChange={(e) => setSuggestionForm((f) => ({ ...f, reason: e.target.value }))}
+                  />
+                </label>
+              </div>
+
+              <button
+                onClick={() => void submitSuggestion()}
+                disabled={isSubmittingSuggestion || !suggestionForm.restaurantName.trim() || !suggestionForm.reason.trim()}
+                className="mt-6 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-4 text-sm font-black text-white shadow-lg shadow-indigo-100 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isSubmittingSuggestion ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {isSubmittingSuggestion ? "저장 중..." : "추천 제출하기"}
+              </button>
             </div>
           </div>
         )}

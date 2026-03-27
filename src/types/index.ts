@@ -86,6 +86,18 @@ export interface Restaurant {
   createdAt: number;
 }
 
+export interface RestaurantSuggestion {
+  id: string;
+  restaurantName: string;
+  rating: number;
+  reason: string;
+  teamId: string;
+  uid: string;
+  userName: string;
+  status: "pending" | "reviewed";
+  createdAt: number;
+}
+
 export interface WorkLocation {
   id: string;
   name: string;
