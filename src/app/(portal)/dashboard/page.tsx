@@ -9,6 +9,7 @@ import {
   ChevronRight,
   CloudSun,
   House,
+  LayoutList,
   Loader2,
   LogOut,
   MapPin,
@@ -21,6 +22,7 @@ import {
   Utensils,
   X,
 } from "lucide-react";
+import BoardView from "@/components/board/BoardView";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -44,7 +46,7 @@ import { getFirebaseClient } from "@/lib/firebase/config";
 import { clearClientSession, SESSION_COOKIE_KEYS } from "@/lib/session";
 import type { CalendarEvent, Notice, Poll, Restaurant, RestaurantSuggestion, WorkLocation } from "@/types";
 
-type TabId = "home" | "calendar" | "lunch" | "vote";
+type TabId = "home" | "calendar" | "lunch" | "vote" | "board";
 
 type WeatherData = {
   temp: number;
@@ -61,6 +63,7 @@ const TAB_TITLES: Record<TabId, string> = {
   calendar: "팀 일정",
   lunch: "점심 추천",
   vote: "투표",
+  board: "팀 게시판",
 };
 
 const WEATHER_CODES: Record<number, string> = {
@@ -697,6 +700,12 @@ export default function DashboardPage() {
             active={activeTab === "vote"}
             onClick={() => setActiveTab("vote")}
           />
+          <SidebarTabButton
+            icon={<LayoutList className="h-4 w-4" />}
+            label="팀 게시판"
+            active={activeTab === "board"}
+            onClick={() => setActiveTab("board")}
+          />
         </nav>
 
         <div className="mt-auto space-y-3 border-t border-slate-100 pt-8">
@@ -1239,6 +1248,11 @@ export default function DashboardPage() {
               </section>
             )}
 
+            {/* Board tab */}
+            {activeTab === "board" && (
+              <BoardView teamId={teamId} uid={uid} userName={userName} />
+            )}
+
             {/* Calendar tab */}
             {activeTab === "calendar" && (
               <section className="flex flex-col gap-6 lg:flex-row lg:items-start">
@@ -1718,6 +1732,12 @@ export default function DashboardPage() {
             label="투표"
             active={activeTab === "vote"}
             onClick={() => setActiveTab("vote")}
+          />
+          <MobileTabButton
+            icon={<LayoutList className="h-5 w-5" />}
+            label="게시판"
+            active={activeTab === "board"}
+            onClick={() => setActiveTab("board")}
           />
         </nav>
       </section>

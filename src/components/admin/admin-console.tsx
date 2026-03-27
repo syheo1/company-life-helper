@@ -61,6 +61,7 @@ import type {
   Notice,
   Poll,
   PollOption,
+  Post,
   Restaurant,
   RestaurantSuggestion,
   Team,
@@ -83,7 +84,8 @@ type AdminPageKey =
   | "restaurants"
   | "polls"
   | "calendar"
-  | "suggestions";
+  | "suggestions"
+  | "board";
 type AccountKind = "front" | "admin";
 
 type PendingUserRow = {
@@ -146,6 +148,7 @@ const NAV_ITEMS: {
   { key: "polls", label: "투표 관리", icon: CheckSquare, group: "content" },
   { key: "calendar", label: "팀 일정 관리", icon: CalendarDays, group: "content" },
   { key: "suggestions", label: "식당 추천 관리", icon: Lightbulb, group: "content" },
+  { key: "board", label: "게시판 관리", icon: Bell, group: "content" },
 ];
 
 const EMOJI_OPTIONS = ["📅", "🎉", "🍻", "🏆", "🎂", "✈️", "💼", "🎯", "🔔", "⭐"];
@@ -191,6 +194,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [polls, setPolls] = useState<Poll[]>([]);
   const [suggestions, setSuggestions] = useState<RestaurantSuggestion[]>([]);
+  const [adminPosts, setAdminPosts] = useState<Post[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [isContentLoading, setIsContentLoading] = useState(false);
 
@@ -292,6 +296,7 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
     else if (activePage === "polls") void loadPolls();
     else if (activePage === "calendar") void loadCalendarEvents();
     else if (activePage === "suggestions") void loadSuggestions();
+    else if (activePage === "board") void loadAdminPosts();
   }, [activePage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Content loaders ---
@@ -408,6 +413,44 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
       const { db } = getFirebaseClient();
       await deleteDoc(doc(db, "restaurantSuggestions", id));
       setSuggestions((prev) => prev.filter((s) => s.id !== id));
+      toast.success("삭제됐습니다.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
+    }
+  }
+
+  async function loadAdminPosts() {
+    setIsContentLoading(true);
+    try {
+      const { db } = getFirebaseClient();
+      const snap = await getDocs(
+        query(collection(db, "posts"), where("teamId", "==", teamId), orderBy("createdAt", "desc")),
+      );
+      setAdminPosts(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Post)));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "게시글을 불러오지 못했습니다.");
+    } finally {
+      setIsContentLoading(false);
+    }
+  }
+
+  async function togglePostPublic(post: Post) {
+    try {
+      const { db } = getFirebaseClient();
+      await updateDoc(doc(db, "posts", post.id), { isPublic: !post.isPublic });
+      setAdminPosts((prev) => prev.map((p) => p.id === post.id ? { ...p, isPublic: !p.isPublic } : p));
+      toast.success(post.isPublic ? "비공개로 변경했습니다." : "공개로 변경했습니다.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "변경에 실패했습니다.");
+    }
+  }
+
+  async function deleteAdminPost(postId: string) {
+    if (!confirm("게시글을 삭제하시겠습니까?")) return;
+    try {
+      const { db } = getFirebaseClient();
+      await deleteDoc(doc(db, "posts", postId));
+      setAdminPosts((prev) => prev.filter((p) => p.id !== postId));
       toast.success("삭제됐습니다.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
@@ -2732,11 +2775,81 @@ export default function AdminConsole({ role, teamId }: AdminConsoleProps) {
             {!isLoading && activePage === "polls" ? renderPolls() : null}
             {!isLoading && activePage === "calendar" ? renderCalendarEvents() : null}
             {!isLoading && activePage === "suggestions" ? renderSuggestions() : null}
+            {!isLoading && activePage === "board" ? renderBoard() : null}
           </div>
         </div>
       </section>
     </main>
   );
+
+  function renderBoard() {
+    return (
+      <div className="max-w-4xl space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-2xl font-black">게시판 관리</h3>
+            <p className="mt-1 text-sm font-medium text-slate-400">
+              팀 게시글의 공개/비공개를 설정하고 삭제할 수 있습니다.
+            </p>
+          </div>
+          <button
+            onClick={() => void loadAdminPosts()}
+            className="flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
+          >
+            새로고침
+          </button>
+        </div>
+
+        {adminPosts.length === 0 ? (
+          <div className="rounded-[2rem] border border-dashed border-slate-200 bg-slate-50 p-12 text-center">
+            <p className="text-sm font-medium text-slate-400">등록된 게시글이 없습니다.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {adminPosts.map((post) => (
+              <div key={post.id} className="flex items-start gap-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-black text-slate-900">{post.title}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                      post.isPublic ? "bg-green-100 text-green-600" : "bg-slate-100 text-slate-500"
+                    }`}>
+                      {post.isPublic ? "공개" : "비공개"}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center gap-2 text-[10px] font-medium text-slate-400">
+                    <span>{post.authorName}</span>
+                    <span>·</span>
+                    <span>{formatDate(post.createdAt)}</span>
+                    <span>·</span>
+                    <span>댓글 {post.commentCount}개</span>
+                  </div>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    onClick={() => void togglePostPublic(post)}
+                    className={`cursor-pointer rounded-xl px-3 py-2 text-xs font-bold transition ${
+                      post.isPublic
+                        ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        : "bg-green-50 text-green-600 hover:bg-green-100"
+                    }`}
+                  >
+                    {post.isPublic ? "비공개로" : "공개로"}
+                  </button>
+                  <button
+                    onClick={() => void deleteAdminPost(post.id)}
+                    className="cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-500 transition hover:bg-red-50 hover:text-red-500"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   function renderSuggestions() {
     const pending = suggestions.filter((s) => s.status === "pending");

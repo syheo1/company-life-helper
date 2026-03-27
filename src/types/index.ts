@@ -86,6 +86,29 @@ export interface Restaurant {
   createdAt: number;
 }
 
+export interface Post {
+  id: string;
+  title: string;
+  content: string;
+  teamId: string;
+  authorId: string;
+  authorName: string;
+  isPublic: boolean;
+  imageUrls?: string[];
+  commentCount: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface Comment {
+  id: string;
+  postId: string;
+  content: string;
+  authorId: string;
+  authorName: string;
+  createdAt: number;
+}
+
 export interface RestaurantSuggestion {
   id: string;
   restaurantName: string;
